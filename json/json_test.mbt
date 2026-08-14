@@ -965,3 +965,34 @@ test "invalid UTF-8 is rejected when text is requested, not before" {
     _ => fail("expected an encoding error")
   }
 }
+
+///|
+/// The string writer classifies sixteen bytes at a time and copies the run up
+/// to the next escape, so the cases that matter are the boundaries: escapes at
+/// a chunk edge, runs shorter than a chunk, and multi-byte sequences straddling
+/// one.
+test "the string writer is correct at every chunk boundary" {
+  let letters = "abcdefghijklmnopqrstuvwxyz"
+  for n in 0..<40 {
+    // A run of exactly n plain bytes, then an escape, then more.
+    let head = letters[0:n % 26].to_owned()
+    for esc in ["\"", "\\", "\n", "\u{0001}"] {
+      let text = head + esc + letters[0:(n + 7) % 26].to_owned()
+      assert_eq((@json.from_string(@json.to_string(text)) : String), text)
+    }
+  }
+  // Multi-byte sequences pushed across the 16-byte boundary one step at a time.
+  for pad in 0..<20 {
+    let text = "a".repeat(pad) + "é☃😀" + "b".repeat(pad)
+    assert_eq((@json.from_string(@json.to_string(text)) : String), text)
+    assert_eq((@json.from_bytes(@json.to_bytes(text)) : String), text)
+  }
+  // Exactly-16 and exactly-32 byte strings, with and without an escape.
+  for
+    text in [
+      "0123456789abcdef", "0123456789abcde\"", "\"123456789abcdef", "0123456789abcdef0123456789abcdef",
+      "0123456789abcdef0123456789abcde\n",
+    ] {
+    assert_eq((@json.from_string(@json.to_string(text)) : String), text)
+  }
+}

@@ -168,33 +168,93 @@ fn JsonSerializer::write_quoted(self : JsonSerializer, s : String) -> Unit {
 let hex_digits : Bytes = b"0123456789abcdef"
 
 ///|
-/// The byte counterpart of `write_quoted`, and simpler: only ASCII ever needs
-/// escaping, and every byte of a multi-byte UTF-8 sequence is >= 0x80, so the
-/// text passes through untouched without being examined as characters.
+/// The bytes a JSON string must escape: `"`, `\` and anything below 0x20.
+/// Every byte of a multi-byte UTF-8 sequence is >= 0x80, so text passes
+/// through without ever being examined as characters.
+let quote_byte : V128 = @v128.i8x16_splat(b'"')
+
+///|
+let backslash_byte : V128 = @v128.i8x16_splat(b'\\')
+
+///|
+let first_printable : V128 = @v128.i8x16_splat(b' ')
+
+///|
+/// Classifies sixteen bytes at once, returning one bit per byte for those
+/// needing an escape, so the next interesting position is a `ctz` away.
+///
+/// This is the classification step of simdjson's `copy_and_find`. It is
+/// deliberately separate from the write loop below: a whole-document stage-1
+/// scan needs exactly this, over blocks rather than over one string, and
+/// should reuse it rather than restate it.
+fn escape_mask(chunk : V128) -> Int {
+  @v128.i8x16_bitmask(
+    @v128.v128_or_(
+      @v128.v128_or_(
+        @v128.i8x16_eq(chunk, quote_byte),
+        @v128.i8x16_eq(chunk, backslash_byte),
+      ),
+      @v128.i8x16_lt_u(chunk, first_printable),
+    ),
+  )
+}
+
+///|
+/// Writes the escape for one byte, `\` already understood to be needed.
+fn JsonSerializer::write_escape(self : JsonSerializer, byte : Byte) -> Unit {
+  let unit = byte.to_int()
+  self.out.write_byte(b'\\')
+  match unit {
+    0x22 => self.out.write_byte(b'"')
+    0x5C => self.out.write_byte(b'\\')
+    0x0A => self.out.write_byte(b'n')
+    0x0D => self.out.write_byte(b'r')
+    0x09 => self.out.write_byte(b't')
+    _ => {
+      // Every other control character takes the long form, and its value is
+      // below 0x20, so the leading two hex digits are always zero.
+      self.out.write_byte(b'u')
+      self.out.write_byte(b'0')
+      self.out.write_byte(b'0')
+      self.out.write_byte(hex_digits[unit >> 4])
+      self.out.write_byte(hex_digits[unit & 0xF])
+    }
+  }
+}
+
+///|
+/// Writes a JSON string literal from UTF-8 bytes.
+///
+/// Sixteen bytes are classified at a time and the run up to the next byte
+/// needing an escape is copied whole, so text without escapes — the
+/// overwhelming majority — costs one comparison and one copy per sixteen
+/// bytes rather than per byte. The tail below sixteen falls back to the scalar
+/// loop, since the input belongs to the caller and may not be padded.
 fn JsonSerializer::write_quoted_bytes(
   self : JsonSerializer,
   s : BytesView,
 ) -> Unit {
   self.out.write_byte(b'"')
-  for i in 0..<s.length() {
-    let byte = s[i]
+  let mut view = s
+  while view is [v128le(chunk), ..] {
+    let mask = escape_mask(chunk)
+    if mask == 0 {
+      self.out.write_bytes(view[:16])
+      view = view[16:]
+    } else {
+      let at = mask.ctz()
+      if at > 0 {
+        self.out.write_bytes(view[:at])
+      }
+      self.write_escape(view[at])
+      view = view[at + 1:]
+    }
+  }
+  for i in 0..<view.length() {
+    let byte = view[i]
     let unit = byte.to_int()
     if unit == 0x22 || unit == 0x5C || unit < 0x20 {
-      self.out.write_byte(b'\\')
-      match unit {
-        0x22 => self.out.write_byte(b'"')
-        0x5C => self.out.write_byte(b'\\')
-        0x0A => self.out.write_byte(b'n')
-        0x0D => self.out.write_byte(b'r')
-        0x09 => self.out.write_byte(b't')
-        _ => {
-          self.out.write_byte(b'u')
-          self.out.write_byte(b'0')
-          self.out.write_byte(b'0')
-          self.out.write_byte(hex_digits[unit >> 4])
-          self.out.write_byte(hex_digits[unit & 0xF])
-        }
-      }
+      self.write_escape(byte)
     } else {
       self.out.write_byte(byte)
     }

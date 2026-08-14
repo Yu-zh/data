@@ -4,6 +4,7 @@ import {
   "moonbitlang/core/string",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/encoding/ascii",
+  "moonbitlang/core/v128",
   "moonbitlang/core/double",
 }
 
@@ -12,3 +13,11 @@ import {
   "moonbitlang/core/bench",
   "moonbitlang/core/json" @corejson,
 } for "test"
+
+// `moonbitlang/core/v128` and the `v128le` bitstring pattern are both marked
+// experimental — "subject to breaking change without notice". We use them
+// deliberately in `serializer.mbt`, and there is no stable alternative, so the
+// alert is silenced here rather than at every call site. If the SIMD surface
+// changes under us, the compile error will say so.
+
+warnings = "-alert_experimental"
