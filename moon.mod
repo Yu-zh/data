@@ -15,15 +15,15 @@ version = "0.1.0"
 
 readme = "README.mbt.md"
 
-repository = ""
+repository = "https://github.com/Yu-zh/data"
 
 license = "Apache-2.0"
 
-keywords = [ ]
+keywords = ["serde", "serialization", "json", "derive"]
 
 preferred_target = "wasm"
 
-description = ""
+description = "A serde-shaped serialization framework: one data model, many formats"
 
 import {
   "moonbitlang/parser@0.3.14",
