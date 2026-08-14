@@ -833,3 +833,33 @@ test "the float fast path agrees across a systematic sweep" {
   }
   inspect(checked, content="4000")
 }
+
+///|
+/// Escapes are ASCII while the text around them may not be, so these put an
+/// escape immediately either side of a surrogate pair.
+test "escapes adjacent to a surrogate pair" {
+  let cases = [
+    "😀", "a😀b", "\"😀\"", "\\😀\\", "\n😀\n", "\u{0000}😀\u{001f}",
+    "😀😀😀", "é☃😀", "\t😀", "😀\r",
+  ]
+  for text in cases {
+    assert_eq((@json.from_string(@json.to_string(text)) : String), text)
+  }
+  // And the bytes are the ones a reader would expect, not a mangled pair.
+  inspect(@json.to_string("\"😀\""), content="\"\\\"😀\\\"\"")
+  assert_eq(@json.to_bytes("😀"), b"\x22\xf0\x9f\x98\x80\x22")
+}
+
+///|
+test "escaping is unchanged by the run-based writer" {
+  inspect(@json.to_string("a\"b\\c"), content="\"a\\\"b\\\\c\"")
+  inspect(@json.to_string("\n\r\t"), content="\"\\n\\r\\t\"")
+  // Control characters with no short escape take the \u00XX long form.
+  inspect(
+    @json.to_string("\u{0000}\u{0001}\u{001f}"),
+    content="\"\\u0000\\u0001\\u001f\"",
+  )
+  inspect(@json.to_string(""), content="\"\"")
+  // A string that needs no escaping at all: the common case, one run.
+  inspect(@json.to_string("plain ascii"), content="\"plain ascii\"")
+}
