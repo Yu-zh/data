@@ -9,6 +9,11 @@
 // There is no way to hook this into `moon build` — the current `moon.pkg`
 // format has no pre-build step — so generated files are committed alongside
 // the sources they came from and the generator is re-run by hand.
+//
+// File access goes through `moonbitlang/async/fs`, which works on both the
+// native and wasm backends. That matters because `moonx` runs the published
+// package as wasm under `moonrun`, so a native-only IO layer would break the
+// documented way of invoking this tool.
 
 ///|
 const USAGE : String =
@@ -64,18 +69,34 @@ fn output_path(path : String) -> String {
 }
 
 ///|
-fn collect(root : String, out : Array[String]) -> Unit raise @fs.IOError {
-  if @fs.is_dir(root) {
-    let entries = @fs.read_dir(root)
-    entries.sort()
-    for entry in entries {
-      if !skip_dir(entry) {
-        collect(if root == "." { entry } else { root + "/" + entry }, out)
-      }
-    }
-  } else if root.has_suffix(".mbt") && !is_generated(root) {
-    out.push(root)
+/// The last segment of a path, for matching a directory against `skip_dir`.
+fn base_name(path : String) -> String {
+  match path.rev_find("/") {
+    Some(at) => path[at + 1:].to_owned()
+    None => path
   }
+}
+
+///|
+async fn collect(root : String, out : Array[String]) -> Unit {
+  if @fs.kind(root) is Regular {
+    if root.has_suffix(".mbt") && !is_generated(root) {
+      out.push(root)
+    }
+    return
+  }
+  @fs.walk(
+    root,
+    (dir, entries) => {
+      entries.sort()
+      for entry in entries {
+        if entry.has_suffix(".mbt") && !is_generated(entry) {
+          out.push(if dir == "." { entry } else { dir + "/" + entry })
+        }
+      }
+    },
+    exclude=path => skip_dir(base_name(path)),
+  )
 }
 
 ///|
@@ -101,8 +122,8 @@ fn fingerprint(source : String) -> String {
 ///|
 /// Generates for one file. Returns a one-line report, or `None` if nothing
 /// changed.
-fn process(path : String) -> String? raise {
-  let source = @fs.read_file_to_string(path)
+async fn process(path : String) -> String? {
+  let source = @fs.read_file(path).text()
   let (impls, reports) = @parser.parse_string(source, name=path)
   if reports.length() > 0 {
     // A file that does not parse is the compiler's problem to report, not
@@ -114,8 +135,8 @@ fn process(path : String) -> String? raise {
   match emit(targets) {
     Some(code) => {
       let formatted = @fmt.format(code)
-      let existing = if @fs.path_exists(target_path) {
-        @fs.read_file_to_string(target_path) catch {
+      let existing = if @fs.exists(target_path) {
+        @fs.read_file(target_path).text() catch {
           _ => ""
         }
       } else {
@@ -124,12 +145,12 @@ fn process(path : String) -> String? raise {
       if fingerprint(existing) == fingerprint(formatted) {
         return None
       }
-      @fs.write_string_to_file(target_path, formatted)
+      @fs.write_file(target_path, formatted, create_mode=CreateOrTruncate)
       Some("wrote    \{target_path}")
     }
     None =>
-      if @fs.path_exists(target_path) {
-        @fs.remove_file(target_path)
+      if @fs.exists(target_path) {
+        @fs.remove(target_path)
         Some("removed  \{target_path}")
       } else {
         None
@@ -138,7 +159,7 @@ fn process(path : String) -> String? raise {
 }
 
 ///|
-fn main {
+async fn main {
   let argv = @env.args()
   let roots = []
   for i in 1..<argv.length() {
@@ -155,8 +176,8 @@ fn main {
   let sources = []
   for root in roots {
     collect(root, sources) catch {
-      IOError(reason) => {
-        println("derive: cannot read `\{root}`: \{reason}")
+      err => {
+        println("derive: cannot read `\{root}`: \{err}")
         return
       }
     }

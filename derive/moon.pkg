@@ -3,9 +3,18 @@ import {
   "moonbitlang/parser/syntax",
   "moonbitlang/parser/attribute",
   "moonbitlang/parser/fmt",
-  "moonbitlang/x/fs",
+  "moonbitlang/async",
+  "moonbitlang/async/fs",
   "moonbitlang/core/list",
   "moonbitlang/core/env",
 }
 
 pkgtype(kind: "executable")
+
+// `moonbitlang/async/fs` is implemented for the native and wasm backends only.
+// That is the whole set this tool needs: `moonx` runs the published package as
+// wasm under `moonrun`, and local development uses either. Declaring it keeps
+// `moon test --target all` from trying to build a generator for a backend it
+// cannot do file IO on.
+
+supported_targets = "+native+wasm"

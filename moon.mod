@@ -27,5 +27,5 @@ description = "A serde-shaped serialization framework: one data model, many form
 
 import {
   "moonbitlang/parser@0.3.14",
-  "moonbitlang/x@0.4.49",
+  "moonbitlang/async@0.20.5",
 }
