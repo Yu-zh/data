@@ -59,15 +59,6 @@ test "a field written outside an object raises" {
 }
 
 ///|
-test "is_fractional splits integer literals from float ones" {
-  assert_true(is_fractional("1.0"))
-  assert_true(is_fractional("1e5"))
-  assert_true(is_fractional("1E5"))
-  assert_false(is_fractional("-12"))
-  assert_false(is_fractional("0"))
-}
-
-///|
 test "describe names printable and unprintable code units" {
   inspect(describe(0x61), content="a")
   inspect(describe(0x7B), content="{")

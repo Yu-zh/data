@@ -698,3 +698,138 @@ test "a document round-trips through bytes without a String anywhere" {
   assert_eq(bytes, b"{\x22x\x22:1,\x22y\x22:2,\x22label\x22:\x22\xc3\xa9\x22}")
   assert_eq((@json.from_bytes(bytes) : Point), p)
 }
+
+///|
+/// Integers are parsed from the input bytes rather than through a `String`,
+/// so the boundary cases are ours to get right rather than core's.
+test "integers parse exactly at the limits of their width" {
+  assert_eq(
+    (@json.from_string("9223372036854775807") : Int64),
+    9223372036854775807L,
+  )
+  // The asymmetric end: the magnitude does not fit in a positive Int64, so it
+  // is only reachable through two's complement negation.
+  assert_eq(
+    (@json.from_string("-9223372036854775808") : Int64),
+    -9223372036854775807L - 1L,
+  )
+  assert_eq(
+    (@json.from_string("18446744073709551615") : UInt64),
+    18446744073709551615UL,
+  )
+  assert_eq((@json.from_string("0") : Int64), 0L)
+  assert_eq((@json.from_string("-0") : Int64), 0L)
+}
+
+///|
+test "integers beyond 64 bits are refused, not truncated" {
+  try (@json.from_string("9223372036854775808") : Int64) catch {
+    e =>
+      inspect(
+        e,
+        content="$: invalid value: expected an integer that fits in 64 bits, found 9223372036854775808",
+      )
+  } noraise {
+    _ => fail("expected an overflow error")
+  }
+  try (@json.from_string("-9223372036854775809") : Int64) catch {
+    e =>
+      inspect(
+        e,
+        content="$: invalid value: expected an integer that fits in 64 bits, found -9223372036854775809",
+      )
+  } noraise {
+    _ => fail("expected an overflow error")
+  }
+  try (@json.from_string("18446744073709551616") : UInt64) catch {
+    e =>
+      inspect(
+        e,
+        content="$: invalid value: expected an unsigned integer that fits in 64 bits, found 18446744073709551616",
+      )
+  } noraise {
+    _ => fail("expected an overflow error")
+  }
+}
+
+///|
+test "a float literal is not accepted where an integer is asked for" {
+  try (@json.from_string("1.5") : Int64) catch {
+    e => inspect(e, content="$: invalid value: expected an integer, found 1.5")
+  } noraise {
+    _ => fail("expected a value error")
+  }
+  try (@json.from_string("-1") : UInt64) catch {
+    e =>
+      inspect(
+        e,
+        content="$: invalid value: expected an unsigned integer, found -1",
+      )
+  } noraise {
+    _ => fail("expected a value error")
+  }
+}
+
+///|
+/// A fast float path that is subtly wrong is worse than none, so it is checked
+/// differentially: every input must produce the *same bits* as core's exact
+/// `@string.parse_double`, not merely a close value.
+fn same_bits(text : String) -> Bool {
+  let mine = @json.parse_double_bytes(@utf8.encode(text))
+  let theirs : Double? = Some(@string.parse_double(text)) catch { _ => None }
+  match (mine, theirs) {
+    // Bit equality, not approximate equality: rounding must match exactly,
+    // and -0.0 must not pass as 0.0.
+    (Some(a), Some(b)) => a.reinterpret_as_int64() == b.reinterpret_as_int64()
+    // Agreeing to reject an input counts as agreeing.
+    (None, None) => true
+    _ => false
+  }
+}
+
+///|
+test "the float fast path agrees with core bit for bit" {
+  let cases = [
+    // Canada-style coordinates: 17 significant digits, which is exactly the
+    // range that defeats the older exact-only fast paths.
+    "-65.613616999999977", "43.420273000000009", "-65.619720000000029",
+    // Ordinary values.
+     "0", "-0", "1", "-1", "1.5", "3.14159265358979", "2.2250738585072014e-308",
+    // Exponent forms.
+     "1e0", "1E5", "1e-5", "1.25e10", "-1.25E-10", "5e-324", "1.7976931348623157e308",
+    // Boundaries the fast path must decline rather than guess.
+     "1e309", "1e-400", "4.9e-324", "2.2250738585072011e-308",
+    // Long and truncated mantissas.
+     "1234567890123456789", "12345678901234567890", "123456789012345678901234567890",
+    "0.1000000000000000055511151231257827021181583404541015625",
+    // Exact ties and near-ties.
+     "9007199254740993", "0.5", "0.125", "1.0000000000000002",
+    // Leading and trailing zeros.
+     "000123", "0.000000000000000000001", "1000000000000000000000",
+  ]
+  let disagreed = cases.filter(t => !same_bits(t))
+  debug_inspect(disagreed, content="[]")
+}
+
+///|
+test "the float fast path agrees across a systematic sweep" {
+  // A deterministic sweep over mantissas and exponents, covering the table's
+  // whole range including where it hands off to the exact converter.
+  let mut seed = 0x2545F4914F6CDD1DUL
+  let mut checked = 0
+  for _ in 0..<4000 {
+    // xorshift64*, so the sweep is reproducible without an RNG dependency.
+    seed = seed ^ (seed >> 12)
+    seed = seed ^ (seed << 25)
+    seed = seed ^ (seed >> 27)
+    let r = seed * 0x2545F4914F6CDD1DUL
+    // Mantissas up to 19 digits, spanning both the fast path and the
+    // truncated case that must defer to the exact converter.
+    let mantissa = r % 9999999999999999999UL
+    let exponent = (r >> 40).to_int() % 400 - 200
+    let text = "\{mantissa}e\{exponent}"
+    assert_true(same_bits(text))
+    checked = checked + 1
+  }
+  inspect(checked, content="4000")
+}

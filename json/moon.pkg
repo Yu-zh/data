@@ -3,6 +3,8 @@ import {
   "moonbitlang/core/buffer",
   "moonbitlang/core/string",
   "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/encoding/ascii",
+  "moonbitlang/core/double",
 }
 
 import {
