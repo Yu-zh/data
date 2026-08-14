@@ -1,0 +1,7 @@
+import {
+  "Yu-zh/data",
+}
+
+import {
+  "Yu-zh/data/json",
+} for "test"

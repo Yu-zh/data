@@ -1,0 +1,52 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "Yu-zh/data/example"
+
+import {
+  "Yu-zh/data",
+  "moonbitlang/core/debug",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub(all) struct Config {
+  max_retries : Int
+  cache_generation : Int
+} derive(Eq, @debug.Debug)
+pub impl @data.Deserialize for Config
+pub impl @data.Serialize for Config
+
+pub(all) struct Pair[A, B] {
+  first : A
+  second : B
+} derive(Eq, @debug.Debug)
+pub impl[A : @data.Deserialize, B : @data.Deserialize] @data.Deserialize for Pair[A, B]
+pub impl[A : @data.Serialize, B : @data.Serialize] @data.Serialize for Pair[A, B]
+
+pub(all) struct Point {
+  x : Int
+  y : Int
+  label : String?
+} derive(Eq, @debug.Debug)
+pub impl @data.Deserialize for Point
+pub impl @data.Serialize for Point
+
+pub(all) struct Rgb(Int, Int, Int) derive(Eq, @debug.Debug)
+pub impl @data.Deserialize for Rgb
+pub impl @data.Serialize for Rgb
+
+pub(all) enum Shape {
+  Empty
+  Circle(Double)
+  Rect(Double, Double)
+  Tagged(name~ : String, size~ : Int)
+  Oval(Double, Double)
+} derive(Eq, @debug.Debug)
+pub impl @data.Deserialize for Shape
+pub impl @data.Serialize for Shape
+
+// Type aliases
+
+// Traits

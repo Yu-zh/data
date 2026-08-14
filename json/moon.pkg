@@ -1,0 +1,10 @@
+import {
+  "Yu-zh/data",
+  "moonbitlang/core/buffer",
+  "moonbitlang/core/string",
+  "moonbitlang/core/encoding/utf8",
+}
+
+import {
+  "moonbitlang/core/double",
+} for "test"

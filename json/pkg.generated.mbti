@@ -1,0 +1,32 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "Yu-zh/data/json"
+
+import {
+  "Yu-zh/data",
+}
+
+// Values
+pub fn[T : @data.Deserialize] from_bytes(Bytes) -> T raise @data.DeError
+
+pub fn[T : @data.Deserialize] from_string(String) -> T raise @data.DeError
+
+pub fn[T : @data.Serialize] to_bytes(T) -> Bytes raise @data.SerError
+
+pub fn[T : @data.Serialize] to_string(T) -> String raise @data.SerError
+
+// Errors
+
+// Types and methods
+type JsonDeserializer
+pub fn JsonDeserializer::finish(Self) -> Unit raise @data.DeError
+pub fn JsonDeserializer::new(Bytes) -> Self
+pub impl @data.Deserializer for JsonDeserializer
+
+type JsonSerializer
+pub fn JsonSerializer::finish(Self) -> Bytes raise @data.SerError
+pub fn JsonSerializer::new() -> Self
+pub impl @data.Serializer for JsonSerializer
+
+// Type aliases
+
+// Traits

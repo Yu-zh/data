@@ -1,0 +1,11 @@
+import {
+  "moonbitlang/parser",
+  "moonbitlang/parser/syntax",
+  "moonbitlang/parser/attribute",
+  "moonbitlang/parser/fmt",
+  "moonbitlang/x/fs",
+  "moonbitlang/core/list",
+  "moonbitlang/core/env",
+}
+
+pkgtype(kind: "executable")

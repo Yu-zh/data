@@ -1,0 +1,5 @@
+// import {
+//   "Yu-zh/data" @lib,
+// }
+
+pkgtype(kind: "executable")
