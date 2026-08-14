@@ -300,12 +300,12 @@ fn JsonDeserializer::decode_escape(
 }
 
 ///|
-/// Locates the string literal at the cursor without consuming it.
+/// Locates the string literal at the cursor without consuming it, stopping at
+/// the closing quote or at the first escape, whichever comes first.
 ///
-/// Returns the content's byte range and whether it contains any escape. Both
-/// callers need the same scan: `parse_string` to know whether it can hand back
-/// one contiguous span, and `field_name` to know whether a raw byte comparison
-/// is meaningful.
+/// Returns the range scanned and whether it ended cleanly at a quote. Stopping
+/// early matters: an escaped string would otherwise be scanned twice, once to
+/// discover the escape and again to build the result.
 fn JsonDeserializer::string_extent(
   self : JsonDeserializer,
 ) -> (Int, Int, Bool) raise @data.DeError {
@@ -313,16 +313,12 @@ fn JsonDeserializer::string_extent(
   let start = self.pos + 1
   let limit = self.input.length()
   let mut i = start
-  let mut escaped = false
   while i < limit {
     let c = self.code(i)
     if c == 0x22 {
-      return (start, i, escaped)
+      return (start, i, true)
     } else if c == 0x5C {
-      escaped = true
-      // Step over the escaped byte so that `\"` does not look like the end.
-      // Longer forms such as `\uXXXX` resume harmlessly on a hex digit.
-      i = i + 2
+      return (start, i, false)
     } else if c < 0x20 {
       raise @data.DeCustom(
         path=self.path,
@@ -332,8 +328,6 @@ fn JsonDeserializer::string_extent(
       i = i + 1
     }
   }
-  // Ran off the end without a closing quote — or an escape did, which the
-  // `i + 2` step can overshoot into.
   raise @data.Eof(path=self.path)
 }
 
@@ -341,17 +335,20 @@ fn JsonDeserializer::string_extent(
 fn JsonDeserializer::parse_string(
   self : JsonDeserializer,
 ) -> String raise @data.DeError {
-  let (start, end, escaped) = self.string_extent()
-  if !escaped {
+  let (start, end, clean) = self.string_extent()
+  if clean {
     // The common case: the value is one contiguous span of the input, so it
     // needs neither a builder nor a copy — just the decode.
     let text = self.decode_chunk(start, end)
     self.pos = end + 1
     return text
   }
-  self.pos = start
+  // Escaped. Carry over the prefix already scanned rather than walking it a
+  // second time, and resume at the escape.
   let out = StringBuilder::new()
-  let mut chunk = start
+  out.write_string(self.decode_chunk(start, end))
+  self.pos = end
+  let mut chunk = end
   while true {
     if self.at_end() {
       raise @data.Eof(path=self.path)
@@ -411,8 +408,8 @@ fn JsonDeserializer::identifier(
   self : JsonDeserializer,
   expected : Array[String],
 ) -> String raise @data.DeError {
-  let (start, end, escaped) = self.string_extent()
-  if !escaped {
+  let (start, end, clean) = self.string_extent()
+  if clean {
     for name in expected {
       if self.spells(start, end, name) {
         self.pos = end + 1

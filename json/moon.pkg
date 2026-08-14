@@ -9,4 +9,6 @@ import {
 
 import {
   "moonbitlang/core/double",
+  "moonbitlang/core/bench",
+  "moonbitlang/core/json" @corejson,
 } for "test"
