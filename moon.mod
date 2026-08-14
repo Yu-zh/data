@@ -19,7 +19,7 @@ repository = "https://github.com/Yu-zh/data"
 
 license = "Apache-2.0"
 
-keywords = ["serde", "serialization", "json", "derive"]
+keywords = [ "serde", "serialization", "json", "derive" ]
 
 preferred_target = "wasm"
 
