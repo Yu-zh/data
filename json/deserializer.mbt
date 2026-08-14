@@ -293,29 +293,55 @@ fn JsonDeserializer::decode_escape(
 /// Returns the range scanned and whether it ended cleanly at a quote. Stopping
 /// early matters: an escaped string would otherwise be scanned twice, once to
 /// discover the escape and again to build the result.
+///
+/// Sixteen bytes are classified at a time by the same `escape_mask` the writer
+/// uses — a JSON string ends, escapes, or is malformed on exactly the classes
+/// it identifies — with a scalar tail for the last partial chunk, since the
+/// input belongs to the caller and may not be padded.
 fn JsonDeserializer::string_extent(
   self : JsonDeserializer,
 ) -> (Int, Int, Bool) raise @data.DeError {
   guard self.peek() == 0x22 else { self.mismatch("string") }
   let start = self.pos + 1
   let limit = self.input.length()
-  let mut i = start
+  let mut view = self.input[start:]
+  let mut base = start
+  while view is [v128le(chunk), ..] {
+    let mask = escape_mask(chunk)
+    if mask != 0 {
+      let at = base + mask.ctz()
+      return self.classify_stop(start, at)
+    }
+    view = view[16:]
+    base = base + 16
+  }
+  let mut i = base
   while i < limit {
     let c = self.code(i)
-    if c == 0x22 {
-      return (start, i, true)
-    } else if c == 0x5C {
-      return (start, i, false)
-    } else if c < 0x20 {
+    if c == 0x22 || c == 0x5C || c < 0x20 {
+      return self.classify_stop(start, i)
+    }
+    i = i + 1
+  }
+  raise @data.Eof(path=self.path)
+}
+
+///|
+/// What the byte at `at` means for a string that began at `start`.
+fn JsonDeserializer::classify_stop(
+  self : JsonDeserializer,
+  start : Int,
+  at : Int,
+) -> (Int, Int, Bool) raise @data.DeError {
+  match self.code(at) {
+    0x22 => (start, at, true)
+    0x5C => (start, at, false)
+    _ =>
       raise @data.DeCustom(
         path=self.path,
         message="unescaped control character in string",
       )
-    } else {
-      i = i + 1
-    }
   }
-  raise @data.Eof(path=self.path)
 }
 
 ///|

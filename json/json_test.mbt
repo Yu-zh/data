@@ -996,3 +996,41 @@ test "the string writer is correct at every chunk boundary" {
     assert_eq((@json.from_string(@json.to_string(text)) : String), text)
   }
 }
+
+///|
+/// The reader scans sixteen bytes at a time too. Round-tripping would hide a
+/// bug that the writer and reader share, so these parse hand-written JSON and
+/// state the expected value directly.
+test "the string reader is correct at every chunk boundary" {
+  let cases : Array[(String, String)] = [
+    // (JSON text, the string it denotes)
+    ("\"\"", ""),
+    ("\"0123456789abcde\"", "0123456789abcde"),
+    ("\"0123456789abcdef\"", "0123456789abcdef"),
+    ("\"0123456789abcdefg\"", "0123456789abcdefg"),
+    // An escape exactly at, just before, and just after the chunk edge.
+    ("\"0123456789abcde\\n\"", "0123456789abcde\n"),
+    ("\"0123456789abcdef\\n\"", "0123456789abcdef\n"),
+    ("\"0123456789abcd\\nef\"", "0123456789abcd\nef"),
+    ("\"\\n0123456789abcdef\"", "\n0123456789abcdef"),
+    // A quote closing exactly on the edge, after a full chunk.
+    ("\"0123456789abcdef0123456789abcdef\"", "0123456789abcdef0123456789abcdef"),
+    // Multi-byte content spanning the edge.
+    ("\"aaaaaaaaaaaaaaé☃\"", "aaaaaaaaaaaaaaé☃"),
+    ("\"aaaaaaaaaaaaaaaa😀\"", "aaaaaaaaaaaaaaaa😀"),
+  ]
+  for entry in cases {
+    let (json, want) = entry
+    assert_eq((@json.from_string(json) : String), want)
+  }
+  // A control character must still be rejected wherever it falls, including
+  // inside a full chunk the vectorised scan handles.
+  for pad in [0, 5, 15, 16, 17, 31] {
+    let bad = "\"" + "a".repeat(pad) + "\u{0001}\""
+    try (@json.from_string(bad) : String) catch {
+      e => inspect(e, content="$: unescaped control character in string")
+    } noraise {
+      _ => fail("expected a control character error at pad \{pad}")
+    }
+  }
+}
