@@ -4,3 +4,6 @@ target/
 target
 .mooncakes/
 .moonagent/
+# Local benchmark harness: large fixtures and vendored third-party md5.
+# Not part of the library, and must not ship in the published package.
+bench/
