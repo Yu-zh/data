@@ -171,18 +171,18 @@ pub impl Serializer for ValueSerializer with fn serialize_double(self, v) {
 
 ///|
 pub impl Serializer for ValueSerializer with fn serialize_char(self, v) {
-  self.emit(Str(@utf8.encode(v.to_string())))
+  self.emit(Str(@utf8.encode(v.to_string())[:]))
 }
 
 ///|
 pub impl Serializer for ValueSerializer with fn serialize_string(self, v) {
-  self.emit(Str(@utf8.encode(v)))
+  self.emit(Str(@utf8.encode(v)[:]))
 }
 
 ///|
 /// The byte path: text that is already UTF-8 goes straight in.
 pub impl Serializer for ValueSerializer with fn serialize_str_bytes(self, v) {
-  self.emit(Str(v.to_owned()))
+  self.emit(Str(v))
 }
 
 ///|
@@ -205,7 +205,7 @@ pub impl Serializer for ValueSerializer with fn serialize_unit_variant(
   self,
   info,
 ) {
-  self.emit(Str(@utf8.encode(info.name)))
+  self.emit(Str(@utf8.encode(info.name)[:]))
 }
 
 ///|
@@ -214,7 +214,9 @@ pub impl Serializer for ValueSerializer with fn serialize_newtype_variant(
   info,
   v,
 ) {
-  self.emit(Map([(Str(@utf8.encode(info.name)), ValueSerializer::capture(v))]))
+  self.emit(
+    Map([(Str(@utf8.encode(info.name)[:]), ValueSerializer::capture(v))]),
+  )
 }
 
 ///|
@@ -273,7 +275,7 @@ pub impl Serializer for ValueSerializer with fn serialize_struct_begin(
 pub impl Serializer for ValueSerializer with fn serialize_field(self, name, v) {
   self
   .map_entries()
-  .push((Str(@utf8.encode(name)), ValueSerializer::capture(v)))
+  .push((Str(@utf8.encode(name)[:]), ValueSerializer::capture(v)))
 }
 
 ///|
@@ -298,7 +300,7 @@ pub impl Serializer for ValueSerializer with fn serialize_tuple_variant_end(
 ) {
   let items = self.close_seq()
   let name = self.take_variant()
-  self.emit(Map([(Str(@utf8.encode(name)), Seq(items))]))
+  self.emit(Map([(Str(@utf8.encode(name)[:]), Seq(items))]))
 }
 
 ///|
@@ -317,7 +319,7 @@ pub impl Serializer for ValueSerializer with fn serialize_struct_variant_end(
 ) {
   let entries = self.close_map()
   let name = self.take_variant()
-  self.emit(Map([(Str(@utf8.encode(name)), Map(entries))]))
+  self.emit(Map([(Str(@utf8.encode(name)[:]), Map(entries))]))
 }
 
 ///|
@@ -503,9 +505,9 @@ pub impl Deserializer for ValueDeserializer with fn deserialize_double(self) {
 /// is the conversion moved to whoever asked for it.
 fn ValueDeserializer::text_of(
   self : ValueDeserializer,
-  bytes : Bytes,
+  bytes : BytesView,
 ) -> String raise DeError {
-  @utf8.decode(bytes[:]) catch {
+  @utf8.decode(bytes) catch {
     _ =>
       raise InvalidValue(
         path=self.path,
@@ -537,7 +539,7 @@ pub impl Deserializer for ValueDeserializer with fn deserialize_char(self) {
 ///|
 pub impl Deserializer for ValueDeserializer with fn deserialize_string(self) {
   guard self.value is Str(s) else { self.mismatch("string") }
-  @utf8.decode(s[:]) catch {
+  @utf8.decode(s) catch {
     _ =>
       raise InvalidValue(
         path=self.path,
@@ -551,7 +553,7 @@ pub impl Deserializer for ValueDeserializer with fn deserialize_string(self) {
 /// The byte path: the value already holds UTF-8, so nothing is converted.
 pub impl Deserializer for ValueDeserializer with fn deserialize_str_bytes(self) {
   guard self.value is Str(s) else { self.mismatch("string") }
-  s[:]
+  s
 }
 
 ///|

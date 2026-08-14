@@ -38,7 +38,7 @@ struct JsonDeserializer {
   /// strings, but the key *type* may be a number, so the token has to be
   /// re-read through whatever `Deserialize` the map's key type provides.
   /// Holding the text avoids re-encoding it just to parse it again.
-  bare : Bytes?
+  bare : BytesView?
 }
 
 ///|
@@ -60,7 +60,7 @@ pub fn JsonDeserializer::finish(
 ///|
 fn JsonDeserializer::key_reader(
   self : JsonDeserializer,
-  text : Bytes,
+  text : BytesView,
 ) -> JsonDeserializer {
   {
     input: b"",
@@ -728,7 +728,7 @@ fn JsonDeserializer::read_int64(
   self : JsonDeserializer,
 ) -> Int64 raise @data.DeError {
   if self.bare is Some(raw) {
-    let text = @ascii.decode_lossy(raw[:])
+    let text = @ascii.decode_lossy(raw)
     return @string.parse_int64(text) catch {
       _ =>
         raise @data.InvalidValue(
@@ -754,7 +754,7 @@ fn JsonDeserializer::read_double(
   self : JsonDeserializer,
 ) -> Double raise @data.DeError {
   if self.bare is Some(raw) {
-    let text = @ascii.decode_lossy(raw[:])
+    let text = @ascii.decode_lossy(raw)
     return @string.parse_double(text) catch {
       _ =>
         raise @data.InvalidValue(
@@ -872,7 +872,7 @@ fn JsonDeserializer::parse_any(
           self.expect(',')
         }
         // The key goes into the data model as the bytes it already is.
-        let key = self.parse_string_bytes().to_owned()
+        let key = self.parse_string_bytes()
         self.expect(':')
         entries.push((@data.Str(key), self.parse_any()))
       }
@@ -891,7 +891,7 @@ fn JsonDeserializer::parse_any(
       self.pos = self.pos + 1
       Seq(items)
     }
-    0x22 => Str(self.parse_string_bytes().to_owned())
+    0x22 => Str(self.parse_string_bytes())
     0x74 => {
       guard self.eat("true") else { self.bad_literal("true") }
       Boolean(true)
@@ -1008,7 +1008,7 @@ pub impl @data.Deserializer for JsonDeserializer with fn deserialize_uint64(
   self,
 ) {
   if self.bare is Some(raw) {
-    let text = @ascii.decode_lossy(raw[:])
+    let text = @ascii.decode_lossy(raw)
     return @string.parse_uint64(text) catch {
       _ =>
         raise @data.InvalidValue(
@@ -1059,7 +1059,7 @@ pub impl @data.Deserializer for JsonDeserializer with fn deserialize_string(
   self,
 ) {
   if self.bare is Some(raw) {
-    @utf8.decode(raw[:]) catch {
+    @utf8.decode(raw) catch {
       _ =>
         raise @data.DeCustom(path=self.path, message="input is not valid UTF-8")
     }
@@ -1131,9 +1131,9 @@ pub impl @data.Deserializer for JsonDeserializer with fn deserialize_map_next_ke
 ) {
   guard self.next_item(0x7D) else { return None }
   let scope = self.top_scope()
-  let key = self.parse_string_bytes().to_owned()
+  let key = self.parse_string_bytes()
   self.expect(':')
-  self.path = scope.base.key(@ascii.decode_lossy(key[:]))
+  self.path = scope.base.key(@ascii.decode_lossy(key))
   scope.count = scope.count + 1
   Some(@data.Deserialize::deserialize(self.key_reader(key)))
 }

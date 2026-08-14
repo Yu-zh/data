@@ -6,7 +6,7 @@
 /// `Serialize` values directly. `Value` fills that gap, and doubles as the
 /// result type of `Deserializer::deserialize_any`.
 ///
-/// Strings are held as UTF-8 `Bytes`, not as MoonBit `String`s. The data model
+/// Strings are held as UTF-8 `BytesView`s, not as MoonBit `String`s. The data model
 /// describes what a document *contains*, and a document contains text in some
 /// encoding — turning that into UTF-16 is a service to one particular consumer,
 /// so the consumer that wants it pays for it. It also means a document can be
@@ -24,7 +24,7 @@ pub(all) enum Value {
   /// Any unsigned integer in the data model, widened.
   UInt(UInt64)
   Double(Double)
-  Str(Bytes)
+  Str(BytesView)
   Bytes(Bytes)
   Seq(Array[Value])
   /// Order-preserving, and keys need not be strings.
@@ -54,7 +54,7 @@ pub fn Value::type_name(self : Value) -> String {
 /// encoded once, not once per entry.
 pub fn Value::get(self : Value, key : String) -> Value? {
   guard self is Map(entries) else { return None }
-  let needle = @utf8.encode(key)
+  let needle = @utf8.encode(key)[:]
   for entry in entries {
     if entry.0 is Str(k) && k == needle {
       return Some(entry.1)
@@ -69,8 +69,25 @@ pub fn Value::get(self : Value, key : String) -> Value? {
 /// The explicit step from the data model's bytes to a MoonBit `String`.
 pub fn Value::text(self : Value) -> String? {
   guard self is Str(bytes) else { return None }
-  Some(@utf8.decode(bytes[:])) catch {
+  Some(@utf8.decode(bytes)) catch {
     _ => None
+  }
+}
+
+///|
+/// Copies every borrowed string, so the value no longer keeps the document it
+/// was parsed from alive.
+///
+/// Parsing borrows by default, which is free and right when a whole document
+/// is being processed. Keeping a handful of fields out of a large one is the
+/// case that wants this: without it, a five-byte key can hold ten megabytes
+/// reachable.
+pub fn Value::detach(self : Value) -> Value {
+  match self {
+    Str(view) => Str(view.to_owned()[:])
+    Seq(items) => Seq(items.map(v => v.detach()))
+    Map(entries) => Map(entries.map(e => (e.0.detach(), e.1.detach())))
+    other => other
   }
 }
 
@@ -84,7 +101,7 @@ pub impl Show for Value with fn output(self, logger) {
     Double(d) => logger.write_string(d.to_string())
     Str(s) => {
       logger.write_string("\"")
-      logger.write_string(@utf8.decode_lossy(s[:]))
+      logger.write_string(@utf8.decode_lossy(s))
       logger.write_string("\"")
     }
     Bytes(b) => {

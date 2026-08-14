@@ -48,11 +48,17 @@ import {
 | `Deserializer` | a format producing the data model |
 | `Value` | the data model made concrete, for when a type is not known ahead of time |
 
-`Value` holds strings as UTF-8 `Bytes`, not as MoonBit `String`s. A document
+`Value` holds strings as UTF-8 `BytesView`s, not as MoonBit `String`s. A document
 contains text in some encoding; turning that into UTF-16 is a service to one
 particular consumer, so the consumer that wants it pays — `Value::text()` — and
 a document can otherwise be read and written again without ever being
-converted. `Serializer` and `Deserializer` carry both paths: `serialize_string`
+converted. Parsing *borrows*: a string in a `Value` is a view into the document
+it came from, so no text is copied at all — MoonBit's collector keeps the
+document alive, with none of the lifetime machinery Rust needs for the same
+trick. The cost is retention, so `Value::detach()` deep-copies when a caller
+keeps a few fields and wants the document released.
+
+`Serializer` and `Deserializer` carry both paths: `serialize_string`
 / `deserialize_string` for text, `serialize_str_bytes` / `deserialize_str_bytes`
 for UTF-8, each defaulting to the other so a format implements only what suits
 it.

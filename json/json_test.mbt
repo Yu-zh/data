@@ -1034,3 +1034,26 @@ test "the string reader is correct at every chunk boundary" {
     }
   }
 }
+
+///|
+/// Parsing borrows: a string in a `Value` is a view into the document it came
+/// from, which costs no copy but keeps the document reachable. `detach` is the
+/// way out for a caller that keeps a few fields and wants the rest released.
+test "values borrow from the document, and detach copies out" {
+  let doc = @utf8.encode("{\"name\":\"ada\",\"note\":\"hi\"}")
+  let value : @data.Value = @json.from_bytes(doc)
+  guard value.get("name") is Some(name) else { fail("missing name") }
+  // Borrowed and detached compare equal — detaching changes provenance, not
+  // content, so nothing downstream can tell them apart.
+  let copied = name.detach()
+  assert_eq(copied, name)
+  assert_eq(copied.text(), Some("ada"))
+  // detach is deep: it reaches inside sequences and maps.
+  let nested : @data.Value = @json.from_bytes(
+    @utf8.encode("{\"xs\":[\"a\",{\"b\":\"c\"}]}"),
+  )
+  assert_eq(nested.detach(), nested)
+  inspect(nested.detach(), content="{\"xs\": [\"a\", {\"b\": \"c\"}]}")
+  // Round-tripping a detached value is byte-identical to the original.
+  assert_eq(@json.to_bytes(value.detach()), @json.to_bytes(value))
+}
