@@ -923,3 +923,45 @@ test "strings with and without escapes both round-trip" {
     assert_eq((@json.from_string(encoded) : String), text)
   }
 }
+
+///|
+/// The data model holds text as UTF-8, so a document can be read and written
+/// again without ever being converted.
+test "text crosses the data model without a transcode" {
+  let text = "{\"kéy\":\"vàlue ☃\",\"n\":[1,2]}"
+  let bytes = @utf8.encode(text)
+  let value : @data.Value = @json.from_bytes(bytes)
+  // The bytes in the value are the bytes from the input.
+  guard value.get("kéy") is Some(v) else { fail("missing key") }
+  assert_eq(v, @data.Str(@utf8.encode("vàlue ☃")))
+  // And writing it back reproduces the input exactly.
+  assert_eq(@json.to_bytes(value), bytes)
+}
+
+///|
+test "the byte path and the String path agree" {
+  let doc = @utf8.encode("\"héllo \\u2603 wörld\"")
+  // Asking for a String decodes; asking for bytes does not.
+  let as_text : String = @json.from_bytes(doc)
+  let as_value : @data.Value = @json.from_bytes(doc)
+  assert_eq(as_value, @data.Str(@utf8.encode(as_text)))
+  assert_eq(as_value.text(), Some(as_text))
+}
+
+///|
+/// A deliberate consequence of not assuming: the parser no longer decodes on
+/// the way in, so bytes that are not valid UTF-8 reach the data model intact
+/// and are only rejected when someone asks for text.
+test "invalid UTF-8 is rejected when text is requested, not before" {
+  let bad = b"\x22a\xffb\x22"
+  // As a Value: carried through untouched.
+  let value : @data.Value = @json.from_bytes(bad)
+  assert_eq(value, @data.Str(b"a\xffb"))
+  assert_eq(value.text(), None)
+  // As a String: the caller asked for text, so the caller gets the error.
+  try (@json.from_bytes(bad) : String) catch {
+    e => inspect(e, content="$: input is not valid UTF-8")
+  } noraise {
+    _ => fail("expected an encoding error")
+  }
+}

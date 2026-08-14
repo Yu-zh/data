@@ -145,7 +145,7 @@ pub impl Serialize for Value with fn serialize(self, s) {
     Int(i) => s.serialize_int64(i)
     UInt(u) => s.serialize_uint64(u)
     Double(d) => s.serialize_double(d)
-    Str(v) => s.serialize_string(v)
+    Str(v) => s.serialize_str_bytes(v[:])
     Bytes(b) => s.serialize_bytes(b)
     Seq(items) => {
       s.serialize_seq_begin(Some(items.length()))

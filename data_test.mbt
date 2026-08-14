@@ -206,12 +206,12 @@ test "structs round-trip" {
 
 ///|
 test "structs tolerate a missing option field and an unknown field" {
-  let partial : @data.Value = Map([(Str("x"), Int(1L)), (Str("y"), Int(2L))])
+  let partial : @data.Value = Map([(Str(b"x"), Int(1L)), (Str(b"y"), Int(2L))])
   assert_eq(@data.from_value(partial), Point::{ x: 1, y: 2, label: None })
   let extra : @data.Value = Map([
-    (Str("x"), Int(1L)),
-    (Str("nope"), Str("ignored")),
-    (Str("y"), Int(2L)),
+    (Str(b"x"), Int(1L)),
+    (Str(b"nope"), Str(b"ignored")),
+    (Str(b"y"), Int(2L)),
   ])
   assert_eq(@data.from_value(extra), Point::{ x: 1, y: 2, label: None })
 }
@@ -232,13 +232,13 @@ test "all four enum variant shapes round-trip, externally tagged" {
 
 ///|
 test "Value is itself part of the data model" {
-  let v : @data.Value = Map([(Str("xs"), Seq([Int(1L), Null, Boolean(true)]))])
+  let v : @data.Value = Map([(Str(b"xs"), Seq([Int(1L), Null, Boolean(true)]))])
   assert_eq(@data.from_value(@data.to_value(v)), v)
 }
 
 ///|
 test "type mismatch reports the path where it happened" {
-  let bad : @data.Value = Seq([Int(1L), Str("nope")])
+  let bad : @data.Value = Seq([Int(1L), Str(b"nope")])
   try (@data.from_value(bad) : Array[Int]) catch {
     e =>
       inspect(e, content="$[1]: invalid type: expected integer, found string")
@@ -250,7 +250,7 @@ test "type mismatch reports the path where it happened" {
 ///|
 test "nested paths accumulate through structs and sequences" {
   let bad : @data.Value = Seq([
-    Map([(Str("x"), Int(1L)), (Str("y"), Str("oops"))]),
+    Map([(Str(b"x"), Int(1L)), (Str(b"y"), Str(b"oops"))]),
   ])
   try (@data.from_value(bad) : Array[Point]) catch {
     e =>
@@ -262,7 +262,7 @@ test "nested paths accumulate through structs and sequences" {
 
 ///|
 test "a missing required field is reported by name" {
-  let bad : @data.Value = Map([(Str("x"), Int(1L))])
+  let bad : @data.Value = Map([(Str(b"x"), Int(1L))])
   try (@data.from_value(bad) : Point) catch {
     e => inspect(e, content="$: missing field `y`")
   } noraise {
@@ -272,7 +272,7 @@ test "a missing required field is reported by name" {
 
 ///|
 test "an unknown variant lists the ones that exist" {
-  let bad : @data.Value = Str("Triangle")
+  let bad : @data.Value = Str(b"Triangle")
   try (@data.from_value(bad) : Shape) catch {
     e =>
       inspect(
@@ -351,9 +351,9 @@ test "every Value constructor survives a round-trip" {
     Int(-1L),
     UInt(18446744073709551615UL),
     Double(0.5),
-    Str("s"),
+    Str(b"s"),
     Bytes(b"\x00\xff"),
-    Map([(Int(1L), Str("keyed"))]),
+    Map([(Int(1L), Str(b"keyed"))]),
   ])
   assert_eq(@data.from_value(@data.to_value(v)), v)
 }
@@ -371,7 +371,7 @@ test "wrong primitive shapes are reported with the expected type" {
   } noraise {
     _ => fail("expected a type error")
   }
-  try (@data.from_value(Str("ab")) : Char) catch {
+  try (@data.from_value(Str(b"ab")) : Char) catch {
     e =>
       inspect(
         e,
@@ -393,7 +393,7 @@ test "a tuple that runs out of elements reports end of input" {
 
 ///|
 test "enums reject unknown payload variants and non-enum shapes" {
-  try (@data.from_value(Map([(Str("Hexagon"), Int(1L))])) : Shape) catch {
+  try (@data.from_value(Map([(Str(b"Hexagon"), Int(1L))])) : Shape) catch {
     e =>
       inspect(
         e,
@@ -513,7 +513,7 @@ test "remaining primitives report their expected type on mismatch" {
   } noraise {
     _ => fail("expected a type error")
   }
-  try (@data.from_value(Str("x")) : UInt64) catch {
+  try (@data.from_value(Str(b"x")) : UInt64) catch {
     e =>
       inspect(
         e,
@@ -522,7 +522,7 @@ test "remaining primitives report their expected type on mismatch" {
   } noraise {
     _ => fail("expected a type error")
   }
-  try (@data.from_value(Str("x")) : Double) catch {
+  try (@data.from_value(Str(b"x")) : Double) catch {
     e => inspect(e, content="$: invalid type: expected float, found string")
   } noraise {
     _ => fail("expected a type error")

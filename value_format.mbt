@@ -171,12 +171,18 @@ pub impl Serializer for ValueSerializer with fn serialize_double(self, v) {
 
 ///|
 pub impl Serializer for ValueSerializer with fn serialize_char(self, v) {
-  self.emit(Str(v.to_string()))
+  self.emit(Str(@utf8.encode(v.to_string())))
 }
 
 ///|
 pub impl Serializer for ValueSerializer with fn serialize_string(self, v) {
-  self.emit(Str(v))
+  self.emit(Str(@utf8.encode(v)))
+}
+
+///|
+/// The byte path: text that is already UTF-8 goes straight in.
+pub impl Serializer for ValueSerializer with fn serialize_str_bytes(self, v) {
+  self.emit(Str(v.to_owned()))
 }
 
 ///|
@@ -199,7 +205,7 @@ pub impl Serializer for ValueSerializer with fn serialize_unit_variant(
   self,
   info,
 ) {
-  self.emit(Str(info.name))
+  self.emit(Str(@utf8.encode(info.name)))
 }
 
 ///|
@@ -208,7 +214,7 @@ pub impl Serializer for ValueSerializer with fn serialize_newtype_variant(
   info,
   v,
 ) {
-  self.emit(Map([(Str(info.name), ValueSerializer::capture(v))]))
+  self.emit(Map([(Str(@utf8.encode(info.name)), ValueSerializer::capture(v))]))
 }
 
 ///|
@@ -265,7 +271,9 @@ pub impl Serializer for ValueSerializer with fn serialize_struct_begin(
 
 ///|
 pub impl Serializer for ValueSerializer with fn serialize_field(self, name, v) {
-  self.map_entries().push((Str(name), ValueSerializer::capture(v)))
+  self
+  .map_entries()
+  .push((Str(@utf8.encode(name)), ValueSerializer::capture(v)))
 }
 
 ///|
@@ -290,7 +298,7 @@ pub impl Serializer for ValueSerializer with fn serialize_tuple_variant_end(
 ) {
   let items = self.close_seq()
   let name = self.take_variant()
-  self.emit(Map([(Str(name), Seq(items))]))
+  self.emit(Map([(Str(@utf8.encode(name)), Seq(items))]))
 }
 
 ///|
@@ -309,7 +317,7 @@ pub impl Serializer for ValueSerializer with fn serialize_struct_variant_end(
 ) {
   let entries = self.close_map()
   let name = self.take_variant()
-  self.emit(Map([(Str(name), Map(entries))]))
+  self.emit(Map([(Str(@utf8.encode(name)), Map(entries))]))
 }
 
 ///|
@@ -490,8 +498,27 @@ pub impl Deserializer for ValueDeserializer with fn deserialize_double(self) {
 }
 
 ///|
+/// The data model holds text as UTF-8, so the paths that must hand back a
+/// MoonBit `String` — chars, field names, variant names — decode here. That
+/// is the conversion moved to whoever asked for it.
+fn ValueDeserializer::text_of(
+  self : ValueDeserializer,
+  bytes : Bytes,
+) -> String raise DeError {
+  @utf8.decode(bytes[:]) catch {
+    _ =>
+      raise InvalidValue(
+        path=self.path,
+        expected="valid UTF-8",
+        found="a byte string",
+      )
+  }
+}
+
+///|
 pub impl Deserializer for ValueDeserializer with fn deserialize_char(self) {
-  guard self.value is Str(s) else { self.mismatch("char") }
+  guard self.value is Str(raw) else { self.mismatch("char") }
+  let s = self.text_of(raw)
   let mut first : Char? = None
   let mut count = 0
   for c in s {
@@ -510,7 +537,21 @@ pub impl Deserializer for ValueDeserializer with fn deserialize_char(self) {
 ///|
 pub impl Deserializer for ValueDeserializer with fn deserialize_string(self) {
   guard self.value is Str(s) else { self.mismatch("string") }
-  s
+  @utf8.decode(s[:]) catch {
+    _ =>
+      raise InvalidValue(
+        path=self.path,
+        expected="valid UTF-8",
+        found=self.value.type_name(),
+      )
+  }
+}
+
+///|
+/// The byte path: the value already holds UTF-8, so nothing is converted.
+pub impl Deserializer for ValueDeserializer with fn deserialize_str_bytes(self) {
+  guard self.value is Str(s) else { self.mismatch("string") }
+  s[:]
 }
 
 ///|
@@ -599,7 +640,7 @@ pub impl Deserializer for ValueDeserializer with fn deserialize_field_name(self)
       found=entries[self.cursor].0.type_name(),
     )
   }
-  Some(name)
+  Some(self.text_of(name))
 }
 
 ///|
@@ -613,7 +654,7 @@ pub impl Deserializer for ValueDeserializer with fn deserialize_field_value(
   let entry = entries[self.cursor]
   self.cursor = self.cursor + 1
   let name = match entry.0 {
-    Str(n) => n
+    Str(n) => self.text_of(n)
     other => other.to_string()
   }
   Deserialize::deserialize(self.child(entry.1, self.path.key(name)))
@@ -632,7 +673,8 @@ pub impl Deserializer for ValueDeserializer with fn deserialize_enum_begin(
 ) {
   match self.value {
     // A unit variant is just its name.
-    Str(variant) => {
+    Str(raw) => {
+      let variant = self.text_of(raw)
       guard known_variant(variants, variant) else {
         raise UnknownVariant(path=self.path, variant~, expected=variants)
       }
@@ -640,7 +682,8 @@ pub impl Deserializer for ValueDeserializer with fn deserialize_enum_begin(
       variant
     }
     // Anything with a payload is externally tagged: { variant: payload }.
-    Map([(Str(variant), payload)]) => {
+    Map([(Str(raw), payload)]) => {
+      let variant = self.text_of(raw)
       guard known_variant(variants, variant) else {
         raise UnknownVariant(path=self.path, variant~, expected=variants)
       }

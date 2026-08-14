@@ -164,6 +164,45 @@ fn JsonSerializer::write_quoted(self : JsonSerializer, s : String) -> Unit {
 }
 
 ///|
+/// Lowercase hex digits, for the `\u00XX` escape of a control character.
+let hex_digits : Bytes = b"0123456789abcdef"
+
+///|
+/// The byte counterpart of `write_quoted`, and simpler: only ASCII ever needs
+/// escaping, and every byte of a multi-byte UTF-8 sequence is >= 0x80, so the
+/// text passes through untouched without being examined as characters.
+fn JsonSerializer::write_quoted_bytes(
+  self : JsonSerializer,
+  s : BytesView,
+) -> Unit {
+  self.out.write_byte(b'"')
+  for i in 0..<s.length() {
+    let byte = s[i]
+    let unit = byte.to_int()
+    if unit == 0x22 || unit == 0x5C || unit < 0x20 {
+      self.out.write_byte(b'\\')
+      match unit {
+        0x22 => self.out.write_byte(b'"')
+        0x5C => self.out.write_byte(b'\\')
+        0x0A => self.out.write_byte(b'n')
+        0x0D => self.out.write_byte(b'r')
+        0x09 => self.out.write_byte(b't')
+        _ => {
+          self.out.write_byte(b'u')
+          self.out.write_byte(b'0')
+          self.out.write_byte(b'0')
+          self.out.write_byte(hex_digits[unit >> 4])
+          self.out.write_byte(hex_digits[unit & 0xF])
+        }
+      }
+    } else {
+      self.out.write_byte(byte)
+    }
+  }
+  self.out.write_byte(b'"')
+}
+
+///|
 /// Numbers are quoted when they appear as an object key and bare otherwise.
 fn JsonSerializer::write_number(self : JsonSerializer, text : String) -> Unit {
   self.pre_value()
@@ -257,6 +296,20 @@ pub impl @data.Serializer for JsonSerializer with fn serialize_char(self, v) {
 pub impl @data.Serializer for JsonSerializer with fn serialize_string(self, v) {
   self.pre_value()
   self.write_quoted(v)
+}
+
+///|
+/// Text that is already UTF-8 is written straight out: no decode on the way
+/// in, no encode on the way back, so a document can be read and rewritten
+/// without ever being converted.
+pub impl @data.Serializer for JsonSerializer with fn serialize_str_bytes(
+  self,
+  v,
+) {
+  // A string, so it is legal as an object key — unlike `serialize_bytes`,
+  // which is the data model's byte-array type and has no key spelling.
+  self.pre_value()
+  self.write_quoted_bytes(v)
 }
 
 ///|

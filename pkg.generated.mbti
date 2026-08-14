@@ -48,12 +48,13 @@ pub(all) enum Value {
   Int(Int64)
   UInt(UInt64)
   Double(Double)
-  Str(String)
+  Str(Bytes)
   Bytes(Bytes)
   Seq(Array[Value])
   Map(Array[(Value, Value)])
 } derive(Eq, @debug.Debug)
 pub fn Value::get(Self, String) -> Self?
+pub fn Value::text(Self) -> String?
 pub fn Value::type_name(Self) -> String
 pub impl Deserialize for Value
 pub impl Serialize for Value
@@ -127,6 +128,7 @@ pub(open) trait Deserializer {
   fn deserialize_double(Self) -> Double raise DeError
   fn deserialize_char(Self) -> Char raise DeError
   fn deserialize_string(Self) -> String raise DeError
+  fn deserialize_str_bytes(Self) -> BytesView raise DeError = _
   fn deserialize_bytes(Self) -> Bytes raise DeError
   fn[T : Deserialize] deserialize_option(Self) -> T? raise DeError
   fn deserialize_unit_struct(Self, String) -> Unit raise DeError = _
@@ -190,6 +192,7 @@ pub(open) trait Serializer {
   fn serialize_double(Self, Double) -> Unit raise SerError
   fn serialize_char(Self, Char) -> Unit raise SerError
   fn serialize_string(Self, String) -> Unit raise SerError
+  fn serialize_str_bytes(Self, BytesView) -> Unit raise SerError = _
   fn serialize_bytes(Self, Bytes) -> Unit raise SerError
   fn serialize_none(Self) -> Unit raise SerError
   fn[T : Serialize] serialize_some(Self, T) -> Unit raise SerError

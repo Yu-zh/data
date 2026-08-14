@@ -245,3 +245,31 @@ test "bench parse escapes (core)" (it : @bench.T) {
   let doc = corpus_escapes(2000)
   it.bench(() => it.keep(parse_core(doc)))
 }
+
+// Core given a `String` it already holds, so the whole-document decode charged
+// to it above is removed. This is the friendlier comparison for core, and the
+// gap between each pair says how much of core's time that decode was.
+
+///|
+test "bench parse numbers (core, pre-decoded)" (it : @bench.T) {
+  let text = @utf8.decode_lossy(corpus_numbers(4000))
+  it.bench(() => it.keep(@corejson.parse(text) catch { _ => Json::null() }))
+}
+
+///|
+test "bench parse keys (core, pre-decoded)" (it : @bench.T) {
+  let text = @utf8.decode_lossy(corpus_keys(4000))
+  it.bench(() => it.keep(@corejson.parse(text) catch { _ => Json::null() }))
+}
+
+///|
+test "bench parse text (core, pre-decoded)" (it : @bench.T) {
+  let text = @utf8.decode_lossy(corpus_text(2000, 24))
+  it.bench(() => it.keep(@corejson.parse(text) catch { _ => Json::null() }))
+}
+
+///|
+test "bench parse escapes (core, pre-decoded)" (it : @bench.T) {
+  let text = @utf8.decode_lossy(corpus_escapes(2000))
+  it.bench(() => it.keep(@corejson.parse(text) catch { _ => Json::null() }))
+}

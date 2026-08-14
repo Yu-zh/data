@@ -56,6 +56,13 @@ pub(open) trait Serializer {
   fn serialize_double(Self, Double) -> Unit raise SerError
   fn serialize_char(Self, Char) -> Unit raise SerError
   fn serialize_string(Self, String) -> Unit raise SerError
+  /// A string that is already UTF-8.
+  ///
+  /// The data model's strings are text, not MoonBit `String`s, and a format
+  /// whose transport is bytes can write them without ever building one.
+  /// Defaults to decoding and going through `serialize_string`, so a format
+  /// that thinks in `String` need not implement it.
+  fn serialize_str_bytes(Self, BytesView) -> Unit raise SerError = _
   fn serialize_bytes(Self, Bytes) -> Unit raise SerError
 
   // ---- option ----
@@ -111,6 +118,15 @@ pub(open) trait Serializer {
   /// same value — an IP address as `"127.0.0.1"` for JSON, as four bytes for a
   /// binary format. Defaults to `true`.
   fn is_human_readable(Self) -> Bool = _
+}
+
+///|
+impl Serializer with fn serialize_str_bytes(self, text) {
+  self.serialize_string(
+    @utf8.decode(text) catch {
+      _ => raise SerCustom(message="string is not valid UTF-8")
+    },
+  )
 }
 
 ///|

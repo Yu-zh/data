@@ -42,6 +42,13 @@ pub(open) trait Deserializer {
   fn deserialize_double(Self) -> Double raise DeError
   fn deserialize_char(Self) -> Char raise DeError
   fn deserialize_string(Self) -> String raise DeError
+  /// A string as its UTF-8 bytes.
+  ///
+  /// The counterpart to `serialize_str_bytes`: a consumer that does not need
+  /// a MoonBit `String` should never pay for one. Defaults to encoding
+  /// `deserialize_string`, so a format holding text as `String` need not
+  /// implement it.
+  fn deserialize_str_bytes(Self) -> BytesView raise DeError = _
   fn deserialize_bytes(Self) -> Bytes raise DeError
 
   // ---- option ----
@@ -103,6 +110,11 @@ pub(open) trait Deserializer {
   /// `DeCustom`. It is what makes `Value` and untagged enums possible.
   fn deserialize_any(Self) -> Value raise DeError
   fn is_human_readable(Self) -> Bool = _
+}
+
+///|
+impl Deserializer with fn deserialize_str_bytes(self) {
+  @utf8.encode(self.deserialize_string())[:]
 }
 
 ///|

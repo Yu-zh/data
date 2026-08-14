@@ -6,6 +6,12 @@
 /// `Serialize` values directly. `Value` fills that gap, and doubles as the
 /// result type of `Deserializer::deserialize_any`.
 ///
+/// Strings are held as UTF-8 `Bytes`, not as MoonBit `String`s. The data model
+/// describes what a document *contains*, and a document contains text in some
+/// encoding — turning that into UTF-16 is a service to one particular consumer,
+/// so the consumer that wants it pays for it. It also means a document can be
+/// read and written again without ever being transcoded.
+///
 /// Structs and enum variants collapse into `Map` here, using serde's default
 /// externally-tagged representation: a unit variant becomes `Str(name)`, and
 /// any variant with a payload becomes a single-entry `Map` from the variant
@@ -18,7 +24,7 @@ pub(all) enum Value {
   /// Any unsigned integer in the data model, widened.
   UInt(UInt64)
   Double(Double)
-  Str(String)
+  Str(Bytes)
   Bytes(Bytes)
   Seq(Array[Value])
   /// Order-preserving, and keys need not be strings.
@@ -43,14 +49,29 @@ pub fn Value::type_name(self : Value) -> String {
 
 ///|
 /// Looks up a key in a `Map` value. Returns `None` for any other shape.
+///
+/// Takes a `String` because that is how a key is written in source; it is
+/// encoded once, not once per entry.
 pub fn Value::get(self : Value, key : String) -> Value? {
   guard self is Map(entries) else { return None }
+  let needle = @utf8.encode(key)
   for entry in entries {
-    if entry.0 is Str(k) && k == key {
+    if entry.0 is Str(k) && k == needle {
       return Some(entry.1)
     }
   }
   None
+}
+
+///|
+/// The text of a `Str`, decoded. `None` for any other shape.
+///
+/// The explicit step from the data model's bytes to a MoonBit `String`.
+pub fn Value::text(self : Value) -> String? {
+  guard self is Str(bytes) else { return None }
+  Some(@utf8.decode(bytes[:])) catch {
+    _ => None
+  }
 }
 
 ///|
@@ -63,7 +84,7 @@ pub impl Show for Value with fn output(self, logger) {
     Double(d) => logger.write_string(d.to_string())
     Str(s) => {
       logger.write_string("\"")
-      logger.write_string(s)
+      logger.write_string(@utf8.decode_lossy(s[:]))
       logger.write_string("\"")
     }
     Bytes(b) => {

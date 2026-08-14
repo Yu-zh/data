@@ -130,7 +130,7 @@ test "an object key is read through the key type's own Deserialize" {
 test "deserialize_any on a key sub-deserializer yields the raw token" {
   let d = JsonDeserializer::new(b"{\"k\":1}")
   let _ = d.deserialize_map_begin()
-  assert_eq((d.deserialize_map_next_key() : @data.Value?), Some(Str("k")))
+  assert_eq((d.deserialize_map_next_key() : @data.Value?), Some(Str(b"k")))
 }
 
 ///|

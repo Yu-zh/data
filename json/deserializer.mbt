@@ -38,7 +38,7 @@ struct JsonDeserializer {
   /// strings, but the key *type* may be a number, so the token has to be
   /// re-read through whatever `Deserialize` the map's key type provides.
   /// Holding the text avoids re-encoding it just to parse it again.
-  bare : String?
+  bare : Bytes?
 }
 
 ///|
@@ -60,7 +60,7 @@ pub fn JsonDeserializer::finish(
 ///|
 fn JsonDeserializer::key_reader(
   self : JsonDeserializer,
-  text : String,
+  text : Bytes,
 ) -> JsonDeserializer {
   {
     input: b"",
@@ -80,19 +80,6 @@ fn JsonDeserializer::key_reader(
 /// inside string literals, where `decode_chunk` handles them.
 fn JsonDeserializer::code(self : JsonDeserializer, i : Int) -> Int {
   self.input[i].to_int()
-}
-
-///|
-/// Decodes a byte range that came from inside a string literal or a number.
-fn JsonDeserializer::decode_chunk(
-  self : JsonDeserializer,
-  start : Int,
-  end : Int,
-) -> String raise @data.DeError {
-  @utf8.decode(self.input[start:end]) catch {
-    _ =>
-      raise @data.DeCustom(path=self.path, message="input is not valid UTF-8")
-  }
 }
 
 ///|
@@ -247,7 +234,7 @@ fn JsonDeserializer::eat_u_escape(self : JsonDeserializer) -> Bool {
 ///|
 fn JsonDeserializer::decode_escape(
   self : JsonDeserializer,
-  out : StringBuilder,
+  out : @buffer.Buffer,
 ) -> Unit raise @data.DeError {
   if self.at_end() {
     raise @data.Eof(path=self.path)
@@ -255,14 +242,14 @@ fn JsonDeserializer::decode_escape(
   let e = self.code(self.pos)
   self.pos = self.pos + 1
   match e {
-    0x22 => out.write_char('"')
-    0x5C => out.write_char('\\')
-    0x2F => out.write_char('/')
-    0x62 => out.write_char(Int::unsafe_to_char(0x08))
-    0x66 => out.write_char(Int::unsafe_to_char(0x0C))
-    0x6E => out.write_char('\n')
-    0x72 => out.write_char('\r')
-    0x74 => out.write_char('\t')
+    0x22 => out.write_byte(b'"')
+    0x5C => out.write_byte(b'\\')
+    0x2F => out.write_byte(b'/')
+    0x62 => out.write_byte(b'\x08')
+    0x66 => out.write_byte(b'\x0C')
+    0x6E => out.write_byte(b'\n')
+    0x72 => out.write_byte(b'\r')
+    0x74 => out.write_byte(b'\t')
     0x75 => {
       let hi = self.hex4()
       if hi >= 0xD800 && hi <= 0xDBFF {
@@ -279,7 +266,7 @@ fn JsonDeserializer::decode_escape(
             message="high surrogate escape is not followed by a low surrogate",
           )
         }
-        out.write_char(
+        out.write_char_utf8(
           Int::unsafe_to_char(0x10000 + (hi - 0xD800) * 0x400 + (lo - 0xDC00)),
         )
       } else if hi >= 0xDC00 && hi <= 0xDFFF {
@@ -288,7 +275,7 @@ fn JsonDeserializer::decode_escape(
           message="unpaired low surrogate escape",
         )
       } else {
-        out.write_char(Int::unsafe_to_char(hi))
+        out.write_char_utf8(Int::unsafe_to_char(hi))
       }
     }
     _ =>
@@ -332,21 +319,22 @@ fn JsonDeserializer::string_extent(
 }
 
 ///|
-fn JsonDeserializer::parse_string(
+/// The string at the cursor, as UTF-8 bytes.
+///
+/// Nothing here ever leaves UTF-8. An unescaped string is a view straight into
+/// the input — no copy at all. An escaped one is unescaped into a byte buffer
+/// the way simdjson does it: literal runs are byte copies and `\uXXXX` becomes
+/// UTF-8 directly, so the fragments never pay for a conversion each.
+fn JsonDeserializer::parse_string_bytes(
   self : JsonDeserializer,
-) -> String raise @data.DeError {
+) -> BytesView raise @data.DeError {
   let (start, end, clean) = self.string_extent()
   if clean {
-    // The common case: the value is one contiguous span of the input, so it
-    // needs neither a builder nor a copy — just the decode.
-    let text = self.decode_chunk(start, end)
     self.pos = end + 1
-    return text
+    return self.input[start:end]
   }
-  // Escaped. Carry over the prefix already scanned rather than walking it a
-  // second time, and resume at the escape.
-  let out = StringBuilder::new()
-  out.write_string(self.decode_chunk(start, end))
+  let out = Buffer(size_hint=(end - start) * 2 + 16)
+  out.write_bytes(self.input[start:end])
   self.pos = end
   let mut chunk = end
   while true {
@@ -355,11 +343,11 @@ fn JsonDeserializer::parse_string(
     }
     let c = self.code(self.pos)
     if c == 0x22 {
-      out.write_string(self.decode_chunk(chunk, self.pos))
+      out.write_bytes(self.input[chunk:self.pos])
       self.pos = self.pos + 1
       break
     } else if c == 0x5C {
-      out.write_string(self.decode_chunk(chunk, self.pos))
+      out.write_bytes(self.input[chunk:self.pos])
       self.pos = self.pos + 1
       self.decode_escape(out)
       chunk = self.pos
@@ -372,7 +360,19 @@ fn JsonDeserializer::parse_string(
       self.pos = self.pos + 1
     }
   }
-  out.to_string()
+  out.to_bytes()[:]
+}
+
+///|
+/// The same string, decoded — for whoever actually asked for a `String`.
+fn JsonDeserializer::parse_string(
+  self : JsonDeserializer,
+) -> String raise @data.DeError {
+  let bytes = self.parse_string_bytes()
+  @utf8.decode(bytes) catch {
+    _ =>
+      raise @data.DeCustom(path=self.path, message="input is not valid UTF-8")
+  }
 }
 
 ///|
@@ -701,7 +701,8 @@ fn JsonDeserializer::uint64_in_span(
 fn JsonDeserializer::read_int64(
   self : JsonDeserializer,
 ) -> Int64 raise @data.DeError {
-  if self.bare is Some(text) {
+  if self.bare is Some(raw) {
+    let text = @ascii.decode_lossy(raw[:])
     return @string.parse_int64(text) catch {
       _ =>
         raise @data.InvalidValue(
@@ -726,7 +727,8 @@ fn JsonDeserializer::read_int64(
 fn JsonDeserializer::read_double(
   self : JsonDeserializer,
 ) -> Double raise @data.DeError {
-  if self.bare is Some(text) {
+  if self.bare is Some(raw) {
+    let text = @ascii.decode_lossy(raw[:])
     return @string.parse_double(text) catch {
       _ =>
         raise @data.InvalidValue(
@@ -832,8 +834,8 @@ fn JsonDeserializer::next_item(
 fn JsonDeserializer::parse_any(
   self : JsonDeserializer,
 ) -> @data.Value raise @data.DeError {
-  if self.bare is Some(text) {
-    return Str(text)
+  if self.bare is Some(raw) {
+    return Str(raw)
   }
   match self.peek() {
     0x7B => {
@@ -843,7 +845,8 @@ fn JsonDeserializer::parse_any(
         if entries.length() > 0 {
           self.expect(',')
         }
-        let key = self.parse_string()
+        // The key goes into the data model as the bytes it already is.
+        let key = self.parse_string_bytes().to_owned()
         self.expect(':')
         entries.push((@data.Str(key), self.parse_any()))
       }
@@ -862,7 +865,7 @@ fn JsonDeserializer::parse_any(
       self.pos = self.pos + 1
       Seq(items)
     }
-    0x22 => Str(self.parse_string())
+    0x22 => Str(self.parse_string_bytes().to_owned())
     0x74 => {
       guard self.eat("true") else { self.bad_literal("true") }
       Boolean(true)
@@ -978,7 +981,8 @@ pub impl @data.Deserializer for JsonDeserializer with fn deserialize_int64(self)
 pub impl @data.Deserializer for JsonDeserializer with fn deserialize_uint64(
   self,
 ) {
-  if self.bare is Some(text) {
+  if self.bare is Some(raw) {
+    let text = @ascii.decode_lossy(raw[:])
     return @string.parse_uint64(text) catch {
       _ =>
         raise @data.InvalidValue(
@@ -1028,8 +1032,11 @@ pub impl @data.Deserializer for JsonDeserializer with fn deserialize_char(self) 
 pub impl @data.Deserializer for JsonDeserializer with fn deserialize_string(
   self,
 ) {
-  if self.bare is Some(text) {
-    text
+  if self.bare is Some(raw) {
+    @utf8.decode(raw[:]) catch {
+      _ =>
+        raise @data.DeCustom(path=self.path, message="input is not valid UTF-8")
+    }
   } else {
     self.parse_string()
   }
@@ -1098,11 +1105,11 @@ pub impl @data.Deserializer for JsonDeserializer with fn deserialize_map_next_ke
 ) {
   guard self.next_item(0x7D) else { return None }
   let scope = self.top_scope()
-  let text = self.parse_string()
+  let key = self.parse_string_bytes().to_owned()
   self.expect(':')
-  self.path = scope.base.key(text)
+  self.path = scope.base.key(@ascii.decode_lossy(key[:]))
   scope.count = scope.count + 1
-  Some(@data.Deserialize::deserialize(self.key_reader(text)))
+  Some(@data.Deserialize::deserialize(self.key_reader(key)))
 }
 
 ///|

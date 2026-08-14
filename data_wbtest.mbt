@@ -10,7 +10,7 @@ test "paths render as JSONPath" {
 
 ///|
 test "Value::get looks up string keys and ignores other shapes" {
-  let v : Value = Map([(Str("a"), Int(1L)), (Int(2L), Str("keyed"))])
+  let v : Value = Map([(Str(b"a"), Int(1L)), (Int(2L), Str(b"keyed"))])
   assert_eq(v.get("a"), Some(Int(1L)))
   assert_eq(v.get("missing"), None)
   assert_eq(Seq([]).get("a"), None)
@@ -25,7 +25,7 @@ test "type_name covers every constructor" {
       Int(1L),
       UInt(1UL),
       Double(1.0),
-      Str(""),
+      Str(b""),
       Bytes(b""),
       Seq([]),
       Map([]),
@@ -129,7 +129,7 @@ test "is_human_readable defaults to true" {
 
 ///|
 test "a child deserializer carries its own path" {
-  let d = ValueDeserializer::new(Seq([Str("a"), Int(1L)]))
+  let d = ValueDeserializer::new(Seq([Str(b"a"), Int(1L)]))
   inspect(d.path(), content="$")
   let _ = d.deserialize_seq_begin()
   let first : String = match d.deserialize_seq_next() {
@@ -143,7 +143,7 @@ test "a child deserializer carries its own path" {
 
 ///|
 test "deserialize_any hands back the value untouched" {
-  let v : Value = Map([(Str("k"), Seq([Int(1L)]))])
+  let v : Value = Map([(Str(b"k"), Seq([Int(1L)]))])
   assert_eq(ValueDeserializer::new(v).deserialize_any(), v)
 }
 
@@ -205,7 +205,7 @@ test "reading a field value past the end reports end of input" {
 /// Map keys need not be strings, so a non-string key reaching the struct
 /// protocol still has to produce a usable path segment.
 test "a non-string map key still yields a path segment" {
-  let d = ValueDeserializer::new(Map([(Int(7L), Str("oops"))]))
+  let d = ValueDeserializer::new(Map([(Int(7L), Str(b"oops"))]))
   d.deserialize_struct_begin("X", [])
   try (d.deserialize_field_value() : Int) catch {
     e => inspect(e, content="$.7: invalid type: expected integer, found string")

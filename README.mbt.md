@@ -48,6 +48,15 @@ import {
 | `Deserializer` | a format producing the data model |
 | `Value` | the data model made concrete, for when a type is not known ahead of time |
 
+`Value` holds strings as UTF-8 `Bytes`, not as MoonBit `String`s. A document
+contains text in some encoding; turning that into UTF-16 is a service to one
+particular consumer, so the consumer that wants it pays — `Value::text()` — and
+a document can otherwise be read and written again without ever being
+converted. `Serializer` and `Deserializer` carry both paths: `serialize_string`
+/ `deserialize_string` for text, `serialize_str_bytes` / `deserialize_str_bytes`
+for UTF-8, each defaulting to the other so a format implements only what suits
+it.
+
 The two traits a *type* implements are, in full:
 
 ```mbt nocheck
@@ -263,11 +272,15 @@ and it round-trips like any other type:
 ```mbt check
 ///|
 test "Value carries any document" {
-  let text = "{\"tags\":[1,-2.5,true,null],\"meta\":{}}"
+  let text = "{\"tags\":[1,-2.5,true,null],\"name\":\"ada\",\"meta\":{}}"
   let value : @data.Value = @json.from_string(text)
   guard value.get("tags") is Some(tags) else { fail("expected a tags field") }
   inspect(tags, content="[1, -2.5, true, null]")
   inspect(@json.to_string(value), content=text)
+  // Strings inside are UTF-8 bytes; `text()` is the explicit step to a String.
+  guard value.get("name") is Some(name) else { fail("expected a name field") }
+  guard name.text() is Some(who) else { fail("expected valid UTF-8") }
+  inspect(who, content="ada")
 }
 ```
 
