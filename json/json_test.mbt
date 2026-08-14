@@ -863,3 +863,63 @@ test "escaping is unchanged by the run-based writer" {
   // A string that needs no escaping at all: the common case, one run.
   inspect(@json.to_string("plain ascii"), content="\"plain ascii\"")
 }
+
+///|
+/// Known field and variant names are returned by identity from the caller's
+/// own array rather than allocated. These check the paths that makes possible,
+/// including the ones that must still fall back.
+test "identifiers resolve however they are spelled" {
+  // Plain match against a declared name.
+  assert_eq((@json.from_string("{\"x\":1,\"y\":2}") : Point), Point::{
+    x: 1,
+    y: 2,
+    label: None,
+  })
+  // An escaped key spells the same field, so it must still be recognised even
+  // though a raw byte comparison cannot see it.
+  assert_eq((@json.from_string("{\"\\u0078\":1,\"y\":2}") : Point), Point::{
+    x: 1,
+    y: 2,
+    label: None,
+  })
+  // A key that is a prefix or extension of a declared one must not match.
+  try (@json.from_string("{\"x\":1,\"yy\":2}") : Point) catch {
+    e => inspect(e, content="$: missing field `y`")
+  } noraise {
+    _ => fail("expected a missing field error")
+  }
+  // Unknown fields are still skipped, and non-ASCII keys do not crash.
+  assert_eq(
+    (@json.from_string("{\"x\":1,\"héllo\":0,\"\":0,\"y\":2}") : Point),
+    Point::{ x: 1, y: 2, label: None },
+  )
+}
+
+///|
+test "variant names resolve however they are spelled" {
+  assert_eq((@json.from_string("\"Empty\"") : Shape), Empty)
+  assert_eq((@json.from_string("\"\\u0045mpty\"") : Shape), Empty)
+  assert_eq((@json.from_string("{\"Circle\":2}") : Shape), Circle(2.0))
+  try (@json.from_string("\"Empt\"") : Shape) catch {
+    e =>
+      inspect(
+        e,
+        content="$: unknown variant `Empt`, expected one of Empty, Circle, Rect, Tagged",
+      )
+  } noraise {
+    _ => fail("expected an unknown variant error")
+  }
+}
+
+///|
+test "strings with and without escapes both round-trip" {
+  // The no-escape path returns one contiguous span; the escape path builds.
+  for
+    text in [
+      "", "plain", "a\"b", "a\\b", "\\", "\"", "tab\there", "nl\nhere", "\u{0000}",
+      "é☃😀", "mixed é \" and 😀 \\ escapes", "trailing\\",
+    ] {
+    let encoded = @json.to_string(text)
+    assert_eq((@json.from_string(encoded) : String), text)
+  }
+}

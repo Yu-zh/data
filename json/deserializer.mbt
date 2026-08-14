@@ -5,6 +5,10 @@
 priv struct Scope {
   base : @data.Path
   mut count : Int
+  /// The field names the caller declared for this struct, empty for arrays
+  /// and maps. Matching a key against these lets `deserialize_field_name`
+  /// hand back the caller's own `String` rather than building a new one.
+  expected : Array[String]
 }
 
 ///|
@@ -296,13 +300,58 @@ fn JsonDeserializer::decode_escape(
 }
 
 ///|
+/// Locates the string literal at the cursor without consuming it.
+///
+/// Returns the content's byte range and whether it contains any escape. Both
+/// callers need the same scan: `parse_string` to know whether it can hand back
+/// one contiguous span, and `field_name` to know whether a raw byte comparison
+/// is meaningful.
+fn JsonDeserializer::string_extent(
+  self : JsonDeserializer,
+) -> (Int, Int, Bool) raise @data.DeError {
+  guard self.peek() == 0x22 else { self.mismatch("string") }
+  let start = self.pos + 1
+  let limit = self.input.length()
+  let mut i = start
+  let mut escaped = false
+  while i < limit {
+    let c = self.code(i)
+    if c == 0x22 {
+      return (start, i, escaped)
+    } else if c == 0x5C {
+      escaped = true
+      // Step over the escaped byte so that `\"` does not look like the end.
+      // Longer forms such as `\uXXXX` resume harmlessly on a hex digit.
+      i = i + 2
+    } else if c < 0x20 {
+      raise @data.DeCustom(
+        path=self.path,
+        message="unescaped control character in string",
+      )
+    } else {
+      i = i + 1
+    }
+  }
+  // Ran off the end without a closing quote — or an escape did, which the
+  // `i + 2` step can overshoot into.
+  raise @data.Eof(path=self.path)
+}
+
+///|
 fn JsonDeserializer::parse_string(
   self : JsonDeserializer,
 ) -> String raise @data.DeError {
-  guard self.peek() == 0x22 else { self.mismatch("string") }
-  self.pos = self.pos + 1
+  let (start, end, escaped) = self.string_extent()
+  if !escaped {
+    // The common case: the value is one contiguous span of the input, so it
+    // needs neither a builder nor a copy — just the decode.
+    let text = self.decode_chunk(start, end)
+    self.pos = end + 1
+    return text
+  }
+  self.pos = start
   let out = StringBuilder::new()
-  let mut chunk = self.pos
+  let mut chunk = start
   while true {
     if self.at_end() {
       raise @data.Eof(path=self.path)
@@ -327,6 +376,51 @@ fn JsonDeserializer::parse_string(
     }
   }
   out.to_string()
+}
+
+///|
+/// Whether the raw bytes in `start..end` spell `name`.
+///
+/// Declared field and variant names are ASCII in practice; a non-ASCII one
+/// simply fails to match here and takes the decoding path.
+fn JsonDeserializer::spells(
+  self : JsonDeserializer,
+  start : Int,
+  end : Int,
+  name : String,
+) -> Bool {
+  if end - start != name.length() {
+    return false
+  }
+  for k in 0..<name.length() {
+    let unit = name[k].to_int()
+    if unit >= 0x80 || unit != self.code(start + k) {
+      return false
+    }
+  }
+  true
+}
+
+///|
+/// Reads an identifier the caller has already named.
+///
+/// On a match the caller's own `String` is returned — the same object, not a
+/// copy — so a known field or variant costs no allocation at all. Only an
+/// unrecognised or escaped name is materialised.
+fn JsonDeserializer::identifier(
+  self : JsonDeserializer,
+  expected : Array[String],
+) -> String raise @data.DeError {
+  let (start, end, escaped) = self.string_extent()
+  if !escaped {
+    for name in expected {
+      if self.spells(start, end, name) {
+        self.pos = end + 1
+        return name
+      }
+    }
+  }
+  self.parse_string()
 }
 
 // ---- numbers ----
@@ -678,8 +772,14 @@ fn JsonDeserializer::int_in_range(
 // ---- scopes ----
 
 ///|
-fn JsonDeserializer::push_scope(self : JsonDeserializer) -> Unit {
-  self.scopes.push({ base: self.path, count: 0 })
+let no_fields : Array[String] = []
+
+///|
+fn JsonDeserializer::push_scope(
+  self : JsonDeserializer,
+  expected : Array[String],
+) -> Unit {
+  self.scopes.push({ base: self.path, count: 0, expected })
 }
 
 ///|
@@ -970,7 +1070,7 @@ pub impl @data.Deserializer for JsonDeserializer with fn deserialize_seq_begin(
   self,
 ) {
   self.expect('[')
-  self.push_scope()
+  self.push_scope(no_fields)
   // A streaming parser cannot know the length without scanning ahead.
   None
 }
@@ -991,7 +1091,7 @@ pub impl @data.Deserializer for JsonDeserializer with fn deserialize_map_begin(
   self,
 ) {
   self.expect('{')
-  self.push_scope()
+  self.push_scope(no_fields)
   None
 }
 
@@ -1019,10 +1119,10 @@ pub impl @data.Deserializer for JsonDeserializer with fn deserialize_map_value(
 pub impl @data.Deserializer for JsonDeserializer with fn deserialize_struct_begin(
   self,
   _name,
-  _fields,
+  fields,
 ) {
   self.expect('{')
-  self.push_scope()
+  self.push_scope(fields)
 }
 
 ///|
@@ -1031,7 +1131,7 @@ pub impl @data.Deserializer for JsonDeserializer with fn deserialize_field_name(
 ) {
   guard self.next_item(0x7D) else { return None }
   let scope = self.top_scope()
-  let name = self.parse_string()
+  let name = self.identifier(scope.expected)
   self.expect(':')
   self.path = scope.base.key(name)
   scope.count = scope.count + 1
@@ -1061,7 +1161,7 @@ pub impl @data.Deserializer for JsonDeserializer with fn deserialize_enum_begin(
   if wrapped {
     self.pos = self.pos + 1
   }
-  let variant = self.parse_string()
+  let variant = self.identifier(variants)
   guard variants.is_empty() || variants.contains(variant) else {
     raise @data.UnknownVariant(path=base, variant~, expected=variants)
   }
@@ -1118,7 +1218,7 @@ pub impl @data.Deserializer for JsonDeserializer with fn deserialize_tuple_begin
   _len,
 ) {
   self.expect('[')
-  self.push_scope()
+  self.push_scope(no_fields)
 }
 
 ///|
