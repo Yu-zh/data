@@ -44,17 +44,12 @@ pub impl @data.Deserialize for Config with fn deserialize(deserializer) {
   let mut f_max_retries = None
   while deserializer.deserialize_field_name() is Some(field) {
     match field {
-      "max-retries" =>
-        f_max_retries = Some(deserializer.deserialize_field_value())
+      "max-retries" => f_max_retries = Some(deserializer.deserialize_field_value())
       _ => deserializer.skip_value()
     }
   }
   {
-    max_retries: @data.required(
-      f_max_retries,
-      "max-retries",
-      deserializer.path(),
-    ),
+    max_retries: @data.required(f_max_retries, "max-retries", deserializer.path()),
     cache_generation: Default::default(),
   }
 }
@@ -62,40 +57,22 @@ pub impl @data.Deserialize for Config with fn deserialize(deserializer) {
 ///|
 pub impl @data.Serialize for Shape with fn serialize(self, serializer) {
   match self {
-    Empty =>
-      serializer.serialize_unit_variant(@data.VariantInfo::{
-        enum_name: "Shape",
-        index: 0,
-        name: "Empty",
-      })
-    Circle(v0) =>
-      serializer.serialize_newtype_variant(
-        @data.VariantInfo::{ enum_name: "Shape", index: 1, name: "Circle" },
-        v0,
-      )
+    Empty => serializer.serialize_unit_variant(@data.VariantInfo::{ enum_name: "Shape", index: 0, name: "Empty" })
+    Circle(v0) => serializer.serialize_newtype_variant(@data.VariantInfo::{ enum_name: "Shape", index: 1, name: "Circle" }, v0)
     Rect(v0, v1) => {
-      serializer.serialize_tuple_variant_begin(
-        @data.VariantInfo::{ enum_name: "Shape", index: 2, name: "Rect" },
-        2,
-      )
+      serializer.serialize_tuple_variant_begin(@data.VariantInfo::{ enum_name: "Shape", index: 2, name: "Rect" }, 2)
       serializer.serialize_tuple_variant_element(v0)
       serializer.serialize_tuple_variant_element(v1)
       serializer.serialize_tuple_variant_end()
     }
     Tagged(name=v0, size=v1) => {
-      serializer.serialize_struct_variant_begin(
-        @data.VariantInfo::{ enum_name: "Shape", index: 3, name: "Tagged" },
-        2,
-      )
+      serializer.serialize_struct_variant_begin(@data.VariantInfo::{ enum_name: "Shape", index: 3, name: "Tagged" }, 2)
       serializer.serialize_struct_variant_field("name", v0)
       serializer.serialize_struct_variant_field("size", v1)
       serializer.serialize_struct_variant_end()
     }
     Oval(v0, v1) => {
-      serializer.serialize_tuple_variant_begin(
-        @data.VariantInfo::{ enum_name: "Shape", index: 4, name: "Ellipse" },
-        2,
-      )
+      serializer.serialize_tuple_variant_begin(@data.VariantInfo::{ enum_name: "Shape", index: 4, name: "Ellipse" }, 2)
       serializer.serialize_tuple_variant_element(v0)
       serializer.serialize_tuple_variant_element(v1)
       serializer.serialize_tuple_variant_end()
@@ -107,19 +84,19 @@ pub impl @data.Serialize for Shape with fn serialize(self, serializer) {
 pub impl @data.Deserialize for Shape with fn deserialize(deserializer) {
   let variants = ["Empty", "Circle", "Rect", "Tagged", "Ellipse"]
   let value = match deserializer.deserialize_enum_begin("Shape", variants) {
-    "Empty" => {
+    0 => {
       deserializer.deserialize_unit_variant()
       Empty
     }
-    "Circle" => Circle(deserializer.deserialize_newtype_variant())
-    "Rect" => {
+    1 => Circle(deserializer.deserialize_newtype_variant())
+    2 => {
       deserializer.deserialize_tuple_begin(2)
       let v0 = deserializer.deserialize_tuple_next()
       let v1 = deserializer.deserialize_tuple_next()
       deserializer.deserialize_tuple_end()
       Rect(v0, v1)
     }
-    "Tagged" => {
+    3 => {
       deserializer.deserialize_struct_begin("Tagged", ["name", "size"])
       let mut f_name = None
       let mut f_size = None
@@ -130,34 +107,24 @@ pub impl @data.Deserialize for Shape with fn deserialize(deserializer) {
           _ => deserializer.skip_value()
         }
       }
-      Tagged(
-        name=@data.required(f_name, "name", deserializer.path()),
-        size=@data.required(f_size, "size", deserializer.path()),
-      )
+      Tagged(name=@data.required(f_name, "name", deserializer.path()), size=@data.required(f_size, "size", deserializer.path()))
     }
-    "Ellipse" => {
+    4 => {
       deserializer.deserialize_tuple_begin(2)
       let v0 = deserializer.deserialize_tuple_next()
       let v1 = deserializer.deserialize_tuple_next()
       deserializer.deserialize_tuple_end()
       Oval(v0, v1)
     }
-    other =>
-      raise @data.UnknownVariant(
-        path=deserializer.path(),
-        variant=other,
-        expected=variants,
-      )
+    index =>
+      raise @data.UnknownVariant(path=deserializer.path(), variant=index.to_string(), expected=variants)
   }
   deserializer.deserialize_enum_end()
   value
 }
 
 ///|
-pub impl[A : @data.Serialize, B : @data.Serialize] @data.Serialize for Pair[
-  A,
-  B,
-] with fn serialize(self, serializer) {
+pub impl[A : @data.Serialize, B : @data.Serialize] @data.Serialize for Pair[A, B] with fn serialize(self, serializer) {
   serializer.serialize_struct_begin("Pair", 2)
   serializer.serialize_field("first", self.first)
   serializer.serialize_field("second", self.second)
@@ -165,10 +132,7 @@ pub impl[A : @data.Serialize, B : @data.Serialize] @data.Serialize for Pair[
 }
 
 ///|
-pub impl[A : @data.Deserialize, B : @data.Deserialize] @data.Deserialize for Pair[
-  A,
-  B,
-] with fn deserialize(deserializer) {
+pub impl[A : @data.Deserialize, B : @data.Deserialize] @data.Deserialize for Pair[A, B] with fn deserialize(deserializer) {
   deserializer.deserialize_struct_begin("Pair", ["first", "second"])
   let mut f_first = None
   let mut f_second = None

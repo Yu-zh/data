@@ -430,6 +430,39 @@ fn JsonDeserializer::spells(
 /// On a match the caller's own `String` is returned — the same object, not a
 /// copy — so a known field or variant costs no allocation at all. Only an
 /// unrecognised or escaped name is materialised.
+/// The position of the upcoming string within `variants`.
+///
+/// The same scan `identifier` does, returning where it landed instead of what
+/// it found — which is what `deserialize_enum_begin` wants, and is one scan
+/// rather than the match-then-`contains` pair this replaced. A string that is
+/// not among them is still consumed, so the error can name it.
+fn JsonDeserializer::variant_index(
+  self : JsonDeserializer,
+  variants : Array[String],
+  base : @data.Path,
+) -> Int raise @data.DeError {
+  let (start, end, clean) = self.string_extent()
+  if clean {
+    for i, name in variants {
+      if self.spells(start, end, name) {
+        self.pos = end + 1
+        return i
+      }
+    }
+  }
+  // Either the token carries escapes, or the byte-wise scan matched nothing.
+  // Decoding is the only way to tell `"Empty"` from a genuinely unknown
+  // variant, so the slow path is a second lookup rather than an error.
+  let found = self.parse_string()
+  for i, name in variants {
+    if name == found {
+      return i
+    }
+  }
+  raise @data.UnknownVariant(path=base, variant=found, expected=variants)
+}
+
+///|
 fn JsonDeserializer::identifier(
   self : JsonDeserializer,
   expected : Array[String],
@@ -1191,16 +1224,13 @@ pub impl @data.Deserializer for JsonDeserializer with fn deserialize_enum_begin(
   if wrapped {
     self.pos = self.pos + 1
   }
-  let variant = self.identifier(variants)
-  guard variants.is_empty() || variants.contains(variant) else {
-    raise @data.UnknownVariant(path=base, variant~, expected=variants)
-  }
+  let index = self.variant_index(variants, base)
   if wrapped {
     self.expect(':')
   }
   self.enums.push({ wrapped, base })
-  self.path = base.key(variant)
-  variant
+  self.path = base.key(variants[index])
+  index
 }
 
 ///|

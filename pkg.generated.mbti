@@ -136,9 +136,9 @@ pub(open) trait Deserializer {
   fn[T : Deserialize] deserialize_newtype_struct(Self, String) -> T raise DeError = _
   fn deserialize_seq_begin(Self) -> Int? raise DeError
   fn[T : Deserialize] deserialize_seq_next(Self) -> T? raise DeError
-  fn deserialize_tuple_begin(Self, Int) -> Unit raise DeError = _
-  fn[T : Deserialize] deserialize_tuple_next(Self) -> T raise DeError = _
-  fn deserialize_tuple_end(Self) -> Unit raise DeError = _
+  fn deserialize_tuple_begin(Self, Int) -> Unit raise DeError
+  fn[T : Deserialize] deserialize_tuple_next(Self) -> T raise DeError
+  fn deserialize_tuple_end(Self) -> Unit raise DeError
   fn deserialize_tuple_struct_begin(Self, String, Int) -> Unit raise DeError = _
   fn deserialize_map_begin(Self) -> Int? raise DeError
   fn[K : Deserialize] deserialize_map_next_key(Self) -> K? raise DeError
@@ -147,7 +147,7 @@ pub(open) trait Deserializer {
   fn deserialize_field_name(Self) -> String? raise DeError
   fn[T : Deserialize] deserialize_field_value(Self) -> T raise DeError
   fn skip_value(Self) -> Unit raise DeError
-  fn deserialize_enum_begin(Self, String, Array[String]) -> String raise DeError
+  fn deserialize_enum_begin(Self, String, Array[String]) -> Int raise DeError
   fn deserialize_unit_variant(Self) -> Unit raise DeError
   fn[T : Deserialize] deserialize_newtype_variant(Self) -> T raise DeError
   fn deserialize_enum_end(Self) -> Unit raise DeError = _

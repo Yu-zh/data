@@ -82,19 +82,19 @@ pub impl @data.Serialize for Shape with fn serialize(self, s) {
 pub impl @data.Deserialize for Shape with fn deserialize(d) {
   let variants = ["Empty", "Circle", "Rect", "Tagged"]
   let shape = match d.deserialize_enum_begin("Shape", variants) {
-    "Empty" => {
+    0 => {
       d.deserialize_unit_variant()
       Empty
     }
-    "Circle" => Circle(d.deserialize_newtype_variant())
-    "Rect" => {
+    1 => Circle(d.deserialize_newtype_variant())
+    2 => {
       d.deserialize_tuple_begin(2)
       let w : Double = d.deserialize_tuple_next()
       let h : Double = d.deserialize_tuple_next()
       d.deserialize_tuple_end()
       Rect(w, h)
     }
-    "Tagged" => {
+    3 => {
       d.deserialize_struct_begin("Tagged", ["name", "size"])
       let mut name : String? = None
       let mut size : Int? = None
@@ -110,10 +110,10 @@ pub impl @data.Deserialize for Shape with fn deserialize(d) {
         size=@data.required(size, "size", d.path()),
       )
     }
-    other =>
+    index =>
       raise @data.UnknownVariant(
         path=d.path(),
-        variant=other,
+        variant=index.to_string(),
         expected=variants,
       )
   }

@@ -146,19 +146,19 @@ test "all four variant shapes" {
       #|pub impl @data.Deserialize for Shape with fn deserialize(deserializer) {
       #|  let variants = ["Empty", "Circle", "Rect", "Tagged"]
       #|  let value = match deserializer.deserialize_enum_begin("Shape", variants) {
-      #|    "Empty" => {
+      #|    0 => {
       #|      deserializer.deserialize_unit_variant()
       #|      Empty
       #|    }
-      #|    "Circle" => Circle(deserializer.deserialize_newtype_variant())
-      #|    "Rect" => {
+      #|    1 => Circle(deserializer.deserialize_newtype_variant())
+      #|    2 => {
       #|      deserializer.deserialize_tuple_begin(2)
       #|      let v0 = deserializer.deserialize_tuple_next()
       #|      let v1 = deserializer.deserialize_tuple_next()
       #|      deserializer.deserialize_tuple_end()
       #|      Rect(v0, v1)
       #|    }
-      #|    "Tagged" => {
+      #|    3 => {
       #|      deserializer.deserialize_struct_begin("Tagged", ["name", "size"])
       #|      let mut f_name = None
       #|      let mut f_size = None
@@ -171,13 +171,14 @@ test "all four variant shapes" {
       #|      }
       #|      Tagged(name=@data.required(f_name, "name", deserializer.path()), size=@data.required(f_size, "size", deserializer.path()))
       #|    }
-      #|    other =>
-      #|      raise @data.UnknownVariant(path=deserializer.path(), variant=other, expected=variants)
+      #|    index =>
+      #|      raise @data.UnknownVariant(path=deserializer.path(), variant=index.to_string(), expected=variants)
       #|  }
       #|  deserializer.deserialize_enum_end()
       #|  value
       #|}
       #|
+
     ),
   )
 }

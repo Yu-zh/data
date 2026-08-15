@@ -63,17 +63,20 @@ pub(open) trait Deserializer {
   fn[T : Deserialize] deserialize_seq_next(Self) -> T? raise DeError
 
   // ---- tuples: length known, so reads are unconditional ----
-  fn deserialize_tuple_begin(Self, Int) -> Unit raise DeError = _
-  fn[T : Deserialize] deserialize_tuple_next(Self) -> T raise DeError = _
-  /// Leaves a tuple.
-  ///
-  /// Unlike a sequence, a tuple is read a known number of times and so never
-  /// observes its own end — nothing else will consume a closing delimiter.
-  /// Any format that writes one **must** override this, along with
-  /// `deserialize_tuple_begin` and `deserialize_tuple_next`; the defaults route
-  /// through the sequence protocol, which is only correct for formats holding
-  /// the whole value in memory.
-  fn deserialize_tuple_end(Self) -> Unit raise DeError = _
+  //
+  // Required rather than defaulted, unlike their `Serializer` counterparts. A
+  // tuple is read a known number of times and so never observes its own end:
+  // nothing else will consume a closing delimiter, and a format whose
+  // sequences carry a length prefix must not read one here. Routing these
+  // through the sequence protocol is correct only for a format holding the
+  // whole value in memory, so as defaults they were silently wrong for every
+  // streaming format whose author did not think to override them — the
+  // opposite of what a default is for. Writing is not symmetric here: a
+  // serializer that spells tuples as sequences is spelling them correctly, so
+  // `serialize_tuple_*` keeps its defaults.
+  fn deserialize_tuple_begin(Self, Int) -> Unit raise DeError
+  fn[T : Deserialize] deserialize_tuple_next(Self) -> T raise DeError
+  fn deserialize_tuple_end(Self) -> Unit raise DeError
   fn deserialize_tuple_struct_begin(Self, String, Int) -> Unit raise DeError = _
 
   // ---- maps ----
@@ -89,10 +92,22 @@ pub(open) trait Deserializer {
   fn skip_value(Self) -> Unit raise DeError
 
   // ---- enums ----
-  /// Enters an enum and returns the variant name. The payload is then read
-  /// with the ordinary unit / newtype / tuple / struct protocols, and the
-  /// whole thing closed with `deserialize_enum_end`.
-  fn deserialize_enum_begin(Self, String, Array[String]) -> String raise DeError
+  /// Enters an enum and returns the variant's position within `variants`.
+  ///
+  /// An index rather than a name, mirroring the `VariantInfo.index` the
+  /// serializer already writes. A binary format reads one straight off the
+  /// wire, and a self-describing format has to scan `variants` to recognise
+  /// the name anyway — so returning the position it landed on saves the
+  /// generated code from matching a string back into the position it started
+  /// as.
+  ///
+  /// The format owns the failure. It holds `variants`, so a tag it cannot
+  /// place must be reported as `UnknownVariant` here rather than passed along
+  /// as an out-of-range index.
+  ///
+  /// The payload is then read with the ordinary unit / newtype / tuple /
+  /// struct protocols, and the whole thing closed with `deserialize_enum_end`.
+  fn deserialize_enum_begin(Self, String, Array[String]) -> Int raise DeError
   fn deserialize_unit_variant(Self) -> Unit raise DeError
   fn[T : Deserialize] deserialize_newtype_variant(Self) -> T raise DeError
   /// Leaves an enum, consuming whatever wrapper the tagging scheme used.
@@ -125,24 +140,6 @@ impl Deserializer with fn deserialize_unit_struct(self, _name) {
 ///|
 impl Deserializer with fn deserialize_newtype_struct(self, _name) {
   Deserialize::deserialize(self)
-}
-
-///|
-impl Deserializer with fn deserialize_tuple_begin(self, _len) {
-  let _ = self.deserialize_seq_begin()
-}
-
-///|
-impl Deserializer with fn deserialize_tuple_next(self) {
-  match self.deserialize_seq_next() {
-    Some(v) => v
-    None => raise Eof(path=self.path())
-  }
-}
-
-///|
-impl Deserializer with fn deserialize_tuple_end(_self) {
-
 }
 
 ///|

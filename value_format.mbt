@@ -421,8 +421,19 @@ fn ValueDeserializer::map_entries(
 }
 
 ///|
-fn known_variant(variants : Array[String], name : String) -> Bool {
-  variants.is_empty() || variants.contains(name)
+/// Where `name` sits in `variants`, which is what `deserialize_enum_begin`
+/// returns. Not finding it is the format's error to raise, not the caller's.
+fn variant_index(
+  variants : Array[String],
+  name : String,
+  path : Path,
+) -> Int raise DeError {
+  for i, candidate in variants {
+    if candidate == name {
+      return i
+    }
+  }
+  raise UnknownVariant(path~, variant=name, expected=variants)
 }
 
 ///|
@@ -677,25 +688,50 @@ pub impl Deserializer for ValueDeserializer with fn deserialize_enum_begin(
     // A unit variant is just its name.
     Str(raw) => {
       let variant = self.text_of(raw)
-      guard known_variant(variants, variant) else {
-        raise UnknownVariant(path=self.path, variant~, expected=variants)
-      }
+      let index = variant_index(variants, variant, self.path)
       self.value = Null
-      variant
+      index
     }
     // Anything with a payload is externally tagged: { variant: payload }.
     Map([(Str(raw), payload)]) => {
       let variant = self.text_of(raw)
-      guard known_variant(variants, variant) else {
-        raise UnknownVariant(path=self.path, variant~, expected=variants)
-      }
+      let index = variant_index(variants, variant, self.path)
       self.path = self.path.key(variant)
       self.value = payload
       self.cursor = 0
-      variant
+      index
     }
     _ => self.mismatch("enum")
   }
+}
+
+///|
+/// Spelled as a sequence, which for a value already in memory is what a tuple
+/// is. These were the trait's defaults until the binary fixture showed the
+/// defaults were wrong for everyone else; `Value` is the case they were
+/// written for, so the old bodies simply move here.
+pub impl Deserializer for ValueDeserializer with fn deserialize_tuple_begin(
+  self,
+  _len,
+) {
+  let _ = self.deserialize_seq_begin()
+}
+
+///|
+pub impl Deserializer for ValueDeserializer with fn deserialize_tuple_next(
+  self,
+) {
+  match self.deserialize_seq_next() {
+    Some(v) => v
+    None => raise Eof(path=self.path)
+  }
+}
+
+///|
+pub impl Deserializer for ValueDeserializer with fn deserialize_tuple_end(
+  _self,
+) {
+
 }
 
 ///|

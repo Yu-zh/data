@@ -228,20 +228,20 @@ fn write_deserialize(out : StringBuilder, target : Target) -> Unit {
       out.write_string(
         "  let value = match deserializer.deserialize_enum_begin(\{quote(target.name)}, variants) {\n",
       )
-      for case_ in cases {
+      for i, case_ in cases {
         match case_.payload {
           Unit => {
-            out.write_string("    \{quote(case_.name)} => {\n")
+            out.write_string("    \{i} => {\n")
             out.write_string("      deserializer.deserialize_unit_variant()\n")
             out.write_string("      \{case_.ident}\n")
             out.write_string("    }\n")
           }
           Newtype =>
             out.write_string(
-              "    \{quote(case_.name)} => \{case_.ident}(deserializer.deserialize_newtype_variant())\n",
+              "    \{i} => \{case_.ident}(deserializer.deserialize_newtype_variant())\n",
             )
           Tuple(arity) => {
-            out.write_string("    \{quote(case_.name)} => {\n")
+            out.write_string("    \{i} => {\n")
             out.write_string(
               "      deserializer.deserialize_tuple_begin(\{arity})\n",
             )
@@ -256,7 +256,7 @@ fn write_deserialize(out : StringBuilder, target : Target) -> Unit {
             out.write_string("    }\n")
           }
           Struct(fields) => {
-            out.write_string("    \{quote(case_.name)} => {\n")
+            out.write_string("    \{i} => {\n")
             out.write_string(
               "      deserializer.deserialize_struct_begin(\{quote(case_.name)}, \{name_list(fields)})\n",
             )
@@ -267,8 +267,12 @@ fn write_deserialize(out : StringBuilder, target : Target) -> Unit {
           }
         }
       }
+      // Unreachable: `deserialize_enum_begin` is contractually required to
+      // raise rather than return an index outside `variants`. The arm exists
+      // for exhaustiveness, and reports a format that broke that contract
+      // rather than trusting it.
       out.write_string(
-        "    other =>\n      raise @data.UnknownVariant(path=deserializer.path(), variant=other, expected=variants)\n",
+        "    index =>\n      raise @data.UnknownVariant(path=deserializer.path(), variant=index.to_string(), expected=variants)\n",
       )
       out.write_string("  }\n")
       out.write_string("  deserializer.deserialize_enum_end()\n")

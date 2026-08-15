@@ -699,10 +699,9 @@ impl @data.Deserializer for BinDeserializer with fn skip_value(_self) {
 }
 
 ///|
-/// `variants` is to enums what `fields` is to structs: the wire carries an
-/// index and the type supplies the spelling. Note that the index is right here
-/// and is immediately discarded so the generated code can match on a string it
-/// then maps back to an index.
+/// `variants` is to enums what `fields` is to structs — except that here the
+/// wire already carries the index, so nothing is needed from it but a bounds
+/// check. The names are never consulted at all.
 impl @data.Deserializer for BinDeserializer with fn deserialize_enum_begin(
   self,
   _name,
@@ -716,7 +715,7 @@ impl @data.Deserializer for BinDeserializer with fn deserialize_enum_begin(
       expected=variants,
     )
   }
-  variants[index]
+  index
 }
 
 ///|
