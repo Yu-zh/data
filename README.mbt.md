@@ -312,6 +312,41 @@ become arrays, and unit becomes `null`. It departs on two points, deliberately:
   `null`, because losing them quietly is worse than failing.
 - **A non-string, non-numeric map key raises** instead of being coerced.
 
+## CBOR specifics
+
+CBOR ([RFC 8949](https://www.rfc-editor.org/rfc/rfc8949)) fits the data model
+more closely than JSON does, because three things JSON has to fake are native
+to it:
+
+```mbt check
+///|
+test "what CBOR carries that JSON cannot" {
+  // A byte string stays bytes, rather than becoming an array of numbers.
+  assert_eq(@cbor.to_bytes(b"\x01\x02"), b"\x42\x01\x02")
+  // A map key need not be a string.
+  let keyed : Map[Int, String] = { 1: "a" }
+  assert_eq((@cbor.from_bytes(@cbor.to_bytes(keyed)) : Map[Int, String]), keyed)
+  // Unsigned and negative integers are distinct major types, so a double is
+  // never mistaken for an integer that happened to be whole.
+  assert_eq(@cbor.to_bytes(1.5), b"\xfb\x3f\xf8\x00\x00\x00\x00\x00\x00")
+}
+```
+
+Everything else follows `serde_cbor`: unit is `null`, `Char` is a
+one-character text string, tuples are arrays, newtype structs are transparent,
+structs are maps with text keys, and enums are externally tagged.
+
+Writing uses definite lengths wherever a length is known and the shortest head
+that fits each integer. That is deterministic for a given value but not
+canonical CBOR — map keys go out in declaration order rather than sorted.
+
+Reading deliberately accepts more than writing produces, since a decoder that
+only understood its own output would be useless for interoperating:
+indefinite-length containers and strings, half-precision floats, and semantic
+tags. **Tags are read and discarded**, so a tagged value decodes as its
+content; `Value` has no case for a tag, and refusing them outright would reject
+ordinary documents from encoders that mark their timestamps.
+
 ## How this differs from Rust's serde
 
 Two deviations, both forced by MoonBit having no associated types.

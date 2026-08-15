@@ -318,3 +318,64 @@ test "P3: the binary fixture and JSON agree on what a value means" {
   @quickcheck.check((x : Shape) => bin_agrees(x))
   @quickcheck.check((x : AnyDouble) => bin_agrees(x), filter=is_finite)
 }
+
+// ---- P2 against CBOR ----
+
+///|
+/// The third format, and the one that conflates the least.
+///
+/// This is where a second and third format actually pay off, and it is not P3:
+/// each format is lenient about different things, so P2 over all of them
+/// catches more than P2 over any one. JSON cannot tell `Bytes` from
+/// `Array[Int]`; the binary fixture cannot tell a struct from a tuple; CBOR
+/// distinguishes both, and so is the only one of the three that would notice a
+/// `Serialize`/`Deserialize` pair that mixed those up.
+test "P2: values round-trip through CBOR" {
+  @quickcheck.check((x : Unit) => @cbor.from_bytes(@cbor.to_bytes(x)) == x)
+  @quickcheck.check((x : Bool) => @cbor.from_bytes(@cbor.to_bytes(x)) == x)
+  @quickcheck.check((x : Byte) => @cbor.from_bytes(@cbor.to_bytes(x)) == x)
+  @quickcheck.check((x : Int) => @cbor.from_bytes(@cbor.to_bytes(x)) == x)
+  @quickcheck.check((x : UInt) => @cbor.from_bytes(@cbor.to_bytes(x)) == x)
+  @quickcheck.check((x : Int64) => @cbor.from_bytes(@cbor.to_bytes(x)) == x)
+  @quickcheck.check((x : UInt64) => @cbor.from_bytes(@cbor.to_bytes(x)) == x)
+  @quickcheck.check((x : Char) => @cbor.from_bytes(@cbor.to_bytes(x)) == x)
+  @quickcheck.check((x : String) => @cbor.from_bytes(@cbor.to_bytes(x)) == x)
+  @quickcheck.check((x : Bytes) => @cbor.from_bytes(@cbor.to_bytes(x)) == x)
+  @quickcheck.check((x : Int?) => @cbor.from_bytes(@cbor.to_bytes(x)) == x)
+  @quickcheck.check((x : Array[Int]) => @cbor.from_bytes(@cbor.to_bytes(x)) == x)
+  @quickcheck.check(
+    (x : Array[Array[String]]) => @cbor.from_bytes(@cbor.to_bytes(x)) == x,
+  )
+  @quickcheck.check(
+    (x : (Int, String)) => @cbor.from_bytes(@cbor.to_bytes(x)) == x,
+  )
+  @quickcheck.check(
+    (x : (Bool, Int, String)) => @cbor.from_bytes(@cbor.to_bytes(x)) == x,
+  )
+  @quickcheck.check((x : Point) => @cbor.from_bytes(@cbor.to_bytes(x)) == x)
+  @quickcheck.check((x : Shape) => @cbor.from_bytes(@cbor.to_bytes(x)) == x)
+}
+
+///|
+/// Doubles across the whole bit space, as for the other two. CBOR writes raw
+/// bits like the fixture does, so this checks the head handling rather than a
+/// float printer.
+test "P2: doubles round-trip through CBOR" {
+  @quickcheck.check(
+    (x : AnyDouble) => @cbor.from_bytes(@cbor.to_bytes(x)) == x,
+    filter=is_finite,
+  )
+}
+
+///|
+/// The distinction JSON has to give up. `Bytes` and `Array[Int]` are separate
+/// major types in CBOR, so their encodings cannot collide however the values
+/// line up.
+test "CBOR keeps bytes and integer arrays apart" {
+  // No escape for the empty case: an empty byte string is `0x40` and an empty
+  // array is `0x80`, so even those two cannot collide.
+  @quickcheck.check((x : Bytes) => {
+    let as_array : Array[Int] = x.iter().map(b => b.to_int()).collect()
+    @cbor.to_bytes(x) != @cbor.to_bytes(as_array)
+  })
+}

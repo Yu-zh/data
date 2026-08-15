@@ -4,6 +4,7 @@ import {
 
 import {
   "Yu-zh/data/json",
+  "Yu-zh/data/cbor",
   "moonbitlang/core/buffer",
   "moonbitlang/core/quickcheck",
   "moonbitlang/core/quickcheck/shrink",

@@ -1,0 +1,28 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "Yu-zh/data/cbor"
+
+import {
+  "Yu-zh/data",
+}
+
+// Values
+pub fn[T : @data.Deserialize] from_bytes(Bytes) -> T raise @data.DeError
+
+pub fn[T : @data.Serialize] to_bytes(T) -> Bytes raise @data.SerError
+
+// Errors
+
+// Types and methods
+type CborDeserializer
+pub fn CborDeserializer::finish(Self) -> Unit raise @data.DeError
+pub fn CborDeserializer::new(Bytes) -> Self
+pub impl @data.Deserializer for CborDeserializer
+
+type CborSerializer
+pub fn CborSerializer::finish(Self) -> Bytes raise @data.SerError
+pub fn CborSerializer::new() -> Self
+pub impl @data.Serializer for CborSerializer
+
+// Type aliases
+
+// Traits
