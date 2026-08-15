@@ -20,4 +20,7 @@ import {
 // alert is silenced here rather than at every call site. If the SIMD surface
 // changes under us, the compile error will say so.
 
-warnings = "-alert_experimental"
+// Warning 79 (`implicit_impl_as_method`) is off project-wide; see the root
+// package's `moon.pkg` for why.
+
+warnings = "-alert_experimental-79"

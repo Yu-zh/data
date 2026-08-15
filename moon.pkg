@@ -5,3 +5,13 @@ import {
 import {
   "Yu-zh/data/json",
 } for "test"
+
+// Warning 79 (`implicit_impl_as_method`) fires once for every `impl Trait for
+// Type` on a type this package declares, including the impls the compiler
+// generates from `derive(...)`, where there is no block to annotate. None of
+// them indicate a problem: every trait method here is reached through a trait
+// bound or a qualified call, never through the promoted form, so the promotion
+// going away is a no-op for us. Silenced across the project until the language
+// settles; the fix at that point is explicit `extend` declarations.
+
+warnings = "-79"
