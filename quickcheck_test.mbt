@@ -228,6 +228,17 @@ fn[T : @data.Serialize + @data.Deserialize + Eq] agree(x : T) -> Bool raise {
 }
 
 ///|
+/// Sends one value through the binary fixture and back.
+///
+/// Separate from `agree` for the same reason `agree` has annotations: both
+/// entry points are generic in their return type.
+fn[T : @data.Serialize + @data.Deserialize + Eq] bin_agrees(x : T) -> Bool raise {
+  let through_bin : T = bin_from_bytes(bin_to_bytes(x))
+  let through_json : T = @json.from_bytes(@json.to_bytes(x))
+  through_bin == through_json
+}
+
+///|
 /// The property that tests the abstraction rather than either implementation.
 /// Both sides can round-trip while disagreeing about which protocol methods a
 /// value goes through; only comparing them catches that.
@@ -240,4 +251,70 @@ test "P3: JSON and Value agree on what a value means" {
   @quickcheck.check((x : (Int, String)) => agree(x))
   @quickcheck.check((x : Point) => agree(x))
   @quickcheck.check((x : Shape) => agree(x))
+}
+
+// ---- P2 and P3 against a format that is not self-describing ----
+
+///|
+/// The same round-trip law as P2, over a format that shares no machinery with
+/// JSON: no delimiters, no field names, no variant names, and no possibility of
+/// `deserialize_any`.
+test "P2: values round-trip through the binary fixture" {
+  @quickcheck.check((x : Unit) => bin_from_bytes(bin_to_bytes(x)) == x)
+  @quickcheck.check((x : Bool) => bin_from_bytes(bin_to_bytes(x)) == x)
+  @quickcheck.check((x : Byte) => bin_from_bytes(bin_to_bytes(x)) == x)
+  @quickcheck.check((x : Int) => bin_from_bytes(bin_to_bytes(x)) == x)
+  @quickcheck.check((x : UInt) => bin_from_bytes(bin_to_bytes(x)) == x)
+  @quickcheck.check((x : Int64) => bin_from_bytes(bin_to_bytes(x)) == x)
+  @quickcheck.check((x : UInt64) => bin_from_bytes(bin_to_bytes(x)) == x)
+  @quickcheck.check((x : Char) => bin_from_bytes(bin_to_bytes(x)) == x)
+  @quickcheck.check((x : String) => bin_from_bytes(bin_to_bytes(x)) == x)
+  @quickcheck.check((x : Bytes) => bin_from_bytes(bin_to_bytes(x)) == x)
+  @quickcheck.check((x : Int?) => bin_from_bytes(bin_to_bytes(x)) == x)
+  @quickcheck.check((x : Array[Int]) => bin_from_bytes(bin_to_bytes(x)) == x)
+  @quickcheck.check(
+    (x : Array[Array[String]]) => bin_from_bytes(bin_to_bytes(x)) == x,
+  )
+  @quickcheck.check((x : (Int, String)) => bin_from_bytes(bin_to_bytes(x)) == x)
+  @quickcheck.check(
+    (x : (Bool, Int, String)) => bin_from_bytes(bin_to_bytes(x)) == x,
+  )
+  @quickcheck.check((x : Point) => bin_from_bytes(bin_to_bytes(x)) == x)
+  @quickcheck.check((x : Shape) => bin_from_bytes(bin_to_bytes(x)) == x)
+}
+
+///|
+/// Doubles again across the whole bit space. The binary path writes raw bits
+/// while JSON goes through Eisel-Lemire and a shortest-representation writer,
+/// so this is the one place the two can disagree without either being obviously
+/// broken.
+test "P2: doubles round-trip through the binary fixture" {
+  @quickcheck.check(
+    (x : AnyDouble) => bin_from_bytes(bin_to_bytes(x)) == x,
+    filter=is_finite,
+  )
+}
+
+///|
+/// P3 as it was meant to be read.
+///
+/// Comparing JSON against `Value` was always a weak pairing: `Value` holds the
+/// whole document in memory and uses the trait defaults that JSON overrides.
+/// The binary fixture shares nothing with JSON — different delimiters (none),
+/// different field identification (positional), different enum tagging (index),
+/// different answer to `deserialize_any` (refusal). If both still land on the
+/// same value, the data model is carrying its weight.
+test "P3: the binary fixture and JSON agree on what a value means" {
+  @quickcheck.check((x : Int) => bin_agrees(x))
+  @quickcheck.check((x : Int64) => bin_agrees(x))
+  @quickcheck.check((x : String) => bin_agrees(x))
+  @quickcheck.check((x : Bytes) => bin_agrees(x))
+  @quickcheck.check((x : Char) => bin_agrees(x))
+  @quickcheck.check((x : Int?) => bin_agrees(x))
+  @quickcheck.check((x : Array[Int]) => bin_agrees(x))
+  @quickcheck.check((x : (Int, String)) => bin_agrees(x))
+  @quickcheck.check((x : (Bool, Int, String)) => bin_agrees(x))
+  @quickcheck.check((x : Point) => bin_agrees(x))
+  @quickcheck.check((x : Shape) => bin_agrees(x))
+  @quickcheck.check((x : AnyDouble) => bin_agrees(x), filter=is_finite)
 }

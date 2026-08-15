@@ -4,6 +4,7 @@ import {
 
 import {
   "Yu-zh/data/json",
+  "moonbitlang/core/buffer",
   "moonbitlang/core/quickcheck",
   "moonbitlang/core/quickcheck/shrink",
 } for "test"
