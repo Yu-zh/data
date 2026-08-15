@@ -1,0 +1,19 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "Yu-zh/data/toml"
+
+import {
+  "Yu-zh/data",
+}
+
+// Values
+pub fn[T : @data.Deserialize] from_string(String) -> T raise @data.DeError
+
+pub fn[T : @data.Serialize] to_string(T) -> String raise @data.SerError
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

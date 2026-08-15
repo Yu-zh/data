@@ -375,18 +375,58 @@ test "every value takes its narrowest form" {
 }
 ```
 
+## TOML specifics
+
+TOML is the one format here that implements neither `Serializer` nor
+`Deserializer`, and that is what TOML is rather than a shortcut. Within a
+table, every scalar key must appear before the first sub-table header, so field
+order is not emission order: a struct `{ a, sub, b }` has to emit `a`, `b`,
+then `[sub]`. A streaming serializer gets `serialize_field` calls in
+declaration order with no lookahead, so it would have to buffer the whole
+document and reorder at `finish` — at which point it is a `Value` builder
+wearing a trait. So this package is a text codec for `Value` instead, and any
+type with `Serialize` and `Deserialize` still works.
+
+```mbt check
+///|
+test "scalars come out before sub-tables" {
+  let doc : Map[String, @data.Value] = {
+    "name": Str(b"prod"),
+    "server": Map([(Str(b"port"), Int(8080L))]),
+  }
+  inspect(
+    @toml.to_string(doc),
+    content=(
+      #|name = "prod"
+      #|
+      #|[server]
+      #|port = 8080
+      #|
+    ),
+  )
+}
+```
+
+What TOML cannot represent, and what happens: a `None` field is omitted (TOML
+has no null); byte strings, non-string keys and a non-table root all raise
+`UnsupportedType`. Reading back, datetimes are refused rather than coerced into
+strings, since a string that used to be a datetime no longer is one.
+
+Infinity and NaN survive, unusually — TOML spells them `inf`, `-inf` and `nan`,
+so this is the one place a format here is wider than JSON.
+
 ## Choosing a format
 
-| | self-describing | `deserialize_any` | bytes as bytes | non-string keys |
-|---|---|---|---|---|
-| JSON | yes | yes | no, an array of numbers | no |
-| CBOR | yes | yes | yes | yes |
-| MessagePack | yes | yes | yes | yes |
+| | self-describing | streaming | bytes as bytes | non-string keys | null |
+|---|---|---|---|---|---|
+| JSON | yes | yes | no, an array of numbers | no | yes |
+| CBOR | yes | yes | yes | yes | yes |
+| MessagePack | yes | yes | yes | yes | yes |
+| TOML | yes | no, buffers | no | no | no |
 
-All three are self-describing, so all three can read into `Value` and all three
-support untyped documents. JSON when a human has to read it; CBOR when a
-standard matters, since it is an IETF RFC; MessagePack when talking to
-something that already speaks it.
+JSON when a human has to read it. CBOR when a standard matters, since it is an
+IETF RFC. MessagePack when talking to something that already speaks it. TOML
+for configuration, where the shape is a table and a person edits the file.
 
 ## How this differs from Rust's serde
 

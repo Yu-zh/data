@@ -1,0 +1,10 @@
+import {
+  "Yu-zh/data",
+  "moonbitlang/core/double",
+  "moonbitlang/core/string",
+}
+
+// Warning 79 (`implicit_impl_as_method`) is off project-wide; see the root
+// package's `moon.pkg` for why.
+
+warnings = "-79"

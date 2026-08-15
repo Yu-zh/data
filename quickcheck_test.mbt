@@ -452,3 +452,66 @@ test "MessagePack integers survive the narrowing ladder" {
     round == x
   })
 }
+
+// ---- P2 against TOML ----
+
+///|
+/// A TOML-shaped document: a table whose keys are arbitrary text.
+///
+/// `Map` has no `Arbitrary` in core, and TOML cannot round-trip an arbitrary
+/// *value* anyway — it has no null, no byte string and no non-table root — so
+/// the property is stated over documents rather than over values.
+struct IntDoc(Map[String, Int]) derive(Eq, Debug)
+
+///|
+impl @quickcheck.Arbitrary for IntDoc with fn arbitrary(size, rs) {
+  let pairs : Array[(String, Int)] = @quickcheck.Arbitrary::arbitrary(size, rs)
+  let out : Map[String, Int] = Map([])
+  for pair in pairs {
+    out[pair.0] = pair.1
+  }
+  IntDoc(out)
+}
+
+///|
+impl @shrink.Shrink for IntDoc
+
+///|
+/// The same, with text values, so escaping is exercised on both sides of the
+/// `=` rather than only in the keys.
+struct TextDoc(Map[String, String]) derive(Eq, Debug)
+
+///|
+impl @quickcheck.Arbitrary for TextDoc with fn arbitrary(size, rs) {
+  let pairs : Array[(String, String)] = @quickcheck.Arbitrary::arbitrary(
+    size, rs,
+  )
+  let out : Map[String, String] = Map([])
+  for pair in pairs {
+    out[pair.0] = pair.1
+  }
+  TextDoc(out)
+}
+
+///|
+impl @shrink.Shrink for TextDoc
+
+///|
+/// TOML is the only format here that goes through `Value` rather than
+/// implementing the traits, so this is also the check that the `Value` path is
+/// a first-class way to be a format.
+///
+/// Keys are where it is fussiest: bare where TOML allows it, quoted otherwise,
+/// and the quoting has to survive being read back. Arbitrary strings reach
+/// spaces, dots, quotes and control characters, all of which change which form
+/// is legal.
+test "P2: documents round-trip through TOML" {
+  @quickcheck.check((x : IntDoc) => {
+    let round : Map[String, Int] = @toml.from_string(@toml.to_string(x.0))
+    round == x.0
+  })
+  @quickcheck.check((x : TextDoc) => {
+    let round : Map[String, String] = @toml.from_string(@toml.to_string(x.0))
+    round == x.0
+  })
+}
