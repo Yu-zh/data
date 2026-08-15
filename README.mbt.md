@@ -347,6 +347,47 @@ tags. **Tags are read and discarded**, so a tagged value decodes as its
 content; `Value` has no case for a tag, and refusing them outright would reject
 ordinary documents from encoders that mark their timestamps.
 
+## MessagePack specifics
+
+MessagePack is CBOR's closest sibling — self-describing, binary, big-endian,
+with byte strings and non-string map keys native — and follows `rmp-serde` on
+everything the data model does not pin down. Two differences from CBOR matter:
+
+**Every length is explicit.** There is no indefinite-length container, so
+`serialize_seq_begin(None)` cannot be honoured and raises `UnsupportedType`.
+Nothing in this library passes `None`, so it is unreachable in practice, but it
+is the clearest illustration of why the hint is an `Int?`: JSON never knows a
+length up front, MessagePack can never do without one, and CBOR can spell
+either.
+
+**Extension types are refused, not skipped.** A CBOR tag wraps a value that
+decodes on its own, so dropping the tag leaves something meaningful. A
+MessagePack ext is a type byte and an opaque payload with no inner value to
+fall back to, and `Value` has no case for one.
+
+```mbt check
+///|
+test "every value takes its narrowest form" {
+  assert_eq(@msgpack.to_bytes(127), b"\x7f")
+  assert_eq(@msgpack.to_bytes(128), b"\xcc\x80")
+  assert_eq(@msgpack.to_bytes(-32), b"\xe0")
+  assert_eq(@msgpack.to_bytes(b"\x01\x02"), b"\xc4\x02\x01\x02")
+}
+```
+
+## Choosing a format
+
+| | self-describing | `deserialize_any` | bytes as bytes | non-string keys |
+|---|---|---|---|---|
+| JSON | yes | yes | no, an array of numbers | no |
+| CBOR | yes | yes | yes | yes |
+| MessagePack | yes | yes | yes | yes |
+
+All three are self-describing, so all three can read into `Value` and all three
+support untyped documents. JSON when a human has to read it; CBOR when a
+standard matters, since it is an IETF RFC; MessagePack when talking to
+something that already speaks it.
+
 ## How this differs from Rust's serde
 
 Two deviations, both forced by MoonBit having no associated types.

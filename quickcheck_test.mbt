@@ -6,12 +6,21 @@
 //
 //   P1  from_value(to_value(x)) == x                the data model round-trips
 //   P2  from_bytes(to_bytes(x)) == x                the format round-trips
-//   P3  the two agree                               the abstraction holds
+//   P3  two formats agree                           kept, but see below
 //
-// P3 is the one that tests `Serializer` rather than any single implementation:
-// a bug in `JsonSerializer` that `ValueSerializer` does not share is invisible
-// to P1 and P2 — both sides can be wrong in the same way and still round-trip —
-// but shows up immediately when the two are compared against each other.
+// P3 was written believing it caught something P1 and P2 could not. It does
+// not: if `json_rt(x) == x` and `bin_rt(x) == x` then `bin_rt(x) == json_rt(x)`
+// follows, so P3 can only fail where a P2 already has. It is kept because it
+// is cheap and does execute, not because it adds signal.
+//
+// What a second and third format actually buy is that each is lenient about
+// different things, so P2 over all of them catches more than P2 over any one:
+//
+//   JSON            conflates Bytes with Array[Int], Char with String,
+//                   tuples with sequences, newtypes with their inner value
+//   binary fixture  conflates a struct with a tuple — both write nothing
+//   CBOR, MsgPack   conflate neither of those; a byte string and a map key
+//                   are first-class
 //
 // `Point` and `Shape` come from `data_test.mbt`; the generators for them live
 // here so the worked examples stay readable as examples.
@@ -377,5 +386,69 @@ test "CBOR keeps bytes and integer arrays apart" {
   @quickcheck.check((x : Bytes) => {
     let as_array : Array[Int] = x.iter().map(b => b.to_int()).collect()
     @cbor.to_bytes(x) != @cbor.to_bytes(as_array)
+  })
+}
+
+// ---- P2 against MessagePack ----
+
+///|
+/// The fourth format. Structurally CBOR's sibling — self-describing, binary,
+/// byte strings and non-string map keys native — so it adds less new signal
+/// than CBOR did over JSON. It earns its place on the integer encoding: every
+/// value picks the narrowest of nine forms, and the decoder has to widen all
+/// nine back, which is far more branching than either of the others has.
+test "P2: values round-trip through MessagePack" {
+  @quickcheck.check((x : Unit) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x)
+  @quickcheck.check((x : Bool) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x)
+  @quickcheck.check((x : Byte) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x)
+  @quickcheck.check((x : Int) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x)
+  @quickcheck.check((x : UInt) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x)
+  @quickcheck.check(
+    (x : Int64) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x,
+  )
+  @quickcheck.check(
+    (x : UInt64) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x,
+  )
+  @quickcheck.check((x : Char) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x)
+  @quickcheck.check(
+    (x : String) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x,
+  )
+  @quickcheck.check(
+    (x : Bytes) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x,
+  )
+  @quickcheck.check((x : Int?) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x)
+  @quickcheck.check(
+    (x : Array[Int]) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x,
+  )
+  @quickcheck.check(
+    (x : Array[Array[String]]) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x,
+  )
+  @quickcheck.check(
+    (x : (Int, String)) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x,
+  )
+  @quickcheck.check((x : Point) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x)
+  @quickcheck.check((x : Shape) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x)
+}
+
+///|
+test "P2: doubles round-trip through MessagePack" {
+  @quickcheck.check(
+    (x : AnyDouble) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x,
+    filter=is_finite,
+  )
+}
+
+///|
+/// Nine integer forms, and the narrowest one is chosen per value — so an
+/// arbitrary `Int64` walks the whole ladder over enough cases, and any form
+/// the decoder widens incorrectly shows up as a value that changed.
+test "MessagePack integers survive the narrowing ladder" {
+  @quickcheck.check((x : Int64) => {
+    let round : Int64 = @msgpack.from_bytes(@msgpack.to_bytes(x))
+    round == x
+  })
+  @quickcheck.check((x : UInt64) => {
+    let round : UInt64 = @msgpack.from_bytes(@msgpack.to_bytes(x))
+    round == x
   })
 }

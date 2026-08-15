@@ -1,0 +1,28 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "Yu-zh/data/msgpack"
+
+import {
+  "Yu-zh/data",
+}
+
+// Values
+pub fn[T : @data.Deserialize] from_bytes(Bytes) -> T raise @data.DeError
+
+pub fn[T : @data.Serialize] to_bytes(T) -> Bytes raise @data.SerError
+
+// Errors
+
+// Types and methods
+type MsgpackDeserializer
+pub fn MsgpackDeserializer::finish(Self) -> Unit raise @data.DeError
+pub fn MsgpackDeserializer::new(Bytes) -> Self
+pub impl @data.Deserializer for MsgpackDeserializer
+
+type MsgpackSerializer
+pub fn MsgpackSerializer::finish(Self) -> Bytes
+pub fn MsgpackSerializer::new() -> Self
+pub impl @data.Serializer for MsgpackSerializer
+
+// Type aliases
+
+// Traits
