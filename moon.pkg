@@ -4,6 +4,8 @@ import {
 
 import {
   "Yu-zh/data/json",
+  "moonbitlang/core/quickcheck",
+  "moonbitlang/core/quickcheck/shrink",
 } for "test"
 
 // Warning 79 (`implicit_impl_as_method`) fires once for every `impl Trait for
