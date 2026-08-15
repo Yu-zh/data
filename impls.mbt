@@ -241,9 +241,29 @@ pub impl[T : Deserialize] Deserialize for T? with fn deserialize(d) {
 }
 
 ///|
+/// Bounds a length hint before it becomes an allocation.
+///
+/// The hint is read from the input, so a hostile four-byte length must not turn
+/// into a multi-gigabyte reservation. A format that can compare the count
+/// against its remaining input should reject it outright; one that cannot — a
+/// streaming reader, say — has no such option, so the cap lives here where
+/// every `Deserialize` benefits. Serde bounds it the same way and for the same
+/// reason (`size_hint::cautious`): reserve a little, and let `push` grow the
+/// rest at the cost of a few reallocations on genuinely large inputs.
+fn cautious_capacity(hint : Int) -> Int {
+  if hint < 0 {
+    0
+  } else if hint > 4096 {
+    4096
+  } else {
+    hint
+  }
+}
+
+///|
 pub impl[T : Deserialize] Deserialize for Array[T] with fn deserialize(d) {
   let out = match d.deserialize_seq_begin() {
-    Some(n) => Array::new(capacity=n)
+    Some(n) => Array::new(capacity=cautious_capacity(n))
     None => []
   }
   while (d.deserialize_seq_next() : T?) is Some(x) {
