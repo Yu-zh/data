@@ -348,7 +348,7 @@ fn generate_error(src : String) -> String {
     let _ = scan(impls, "<test>")
     "<no error>"
   } catch {
-    e => e.to_string()
+    e => Show::to_string(e)
   }
 }
 

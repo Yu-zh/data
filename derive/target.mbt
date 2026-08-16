@@ -66,12 +66,12 @@ enum Payload {
 ///|
 /// A problem with the *attributes*, as opposed to a parse error. Carries a
 /// location prefix so the message reads like a compiler diagnostic.
-pub suberror DeriveError {
+suberror DeriveError {
   DeriveError(where_~ : String, message~ : String)
 }
 
 ///|
-pub impl Show for DeriveError with fn output(self, logger) {
+impl Show for DeriveError with fn output(self, logger) {
   let DeriveError(where_~, message~) = self
   logger.write_string("\{where_}: \{message}")
 }

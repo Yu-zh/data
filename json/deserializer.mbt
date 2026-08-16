@@ -625,17 +625,6 @@ fn scan_to_double(scan : NumberScan, text : () -> String) -> Double? {
 }
 
 ///|
-/// Parses a JSON number from UTF-8 bytes.
-///
-/// The byte-oriented counterpart to `@string.parse_double`, which core does
-/// not provide. Returns `None` if `input` is not a single JSON number.
-pub fn parse_double_bytes(input : BytesView) -> Double? {
-  guard scan_number(input) is Some((scan, used)) else { return None }
-  guard used == input.length() else { return None }
-  scan_to_double(scan, () => @ascii.decode_lossy(input))
-}
-
-///|
 /// Scans the number at the cursor, advancing past it.
 fn JsonDeserializer::take_number(
   self : JsonDeserializer,

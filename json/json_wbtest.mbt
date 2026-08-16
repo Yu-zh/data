@@ -142,3 +142,79 @@ test "reading a container item without a begin raises" {
     _ => fail("expected a protocol error")
   }
 }
+
+///|
+/// A fast float path that is subtly wrong is worse than none, so it is checked
+/// differentially: every input must produce the *same bits* as core's exact
+/// `@string.parse_double`, not merely a close value.
+fn same_bits(text : String) -> Bool {
+  // Composed here rather than behind a helper in the parser, so the test
+  // exercises exactly the pair `read_double` uses and the library exports
+  // nothing extra to make itself testable.
+  let input = @utf8.encode(text)[:]
+  let mine = match scan_number(input) {
+    Some((scan, used)) =>
+      if used == input.length() {
+        scan_to_double(scan, () => @ascii.decode_lossy(input))
+      } else {
+        None
+      }
+    None => None
+  }
+  let theirs : Double? = Some(@string.parse_double(text)) catch { _ => None }
+  match (mine, theirs) {
+    // Bit equality, not approximate equality: rounding must match exactly,
+    // and -0.0 must not pass as 0.0.
+    (Some(a), Some(b)) => a.reinterpret_as_int64() == b.reinterpret_as_int64()
+    // Agreeing to reject an input counts as agreeing.
+    (None, None) => true
+    _ => false
+  }
+}
+
+///|
+test "the float fast path agrees with core bit for bit" {
+  let cases = [
+    // Canada-style coordinates: 17 significant digits, which is exactly the
+    // range that defeats the older exact-only fast paths.
+    "-65.613616999999977", "43.420273000000009", "-65.619720000000029",
+    // Ordinary values.
+     "0", "-0", "1", "-1", "1.5", "3.14159265358979", "2.2250738585072014e-308",
+    // Exponent forms.
+     "1e0", "1E5", "1e-5", "1.25e10", "-1.25E-10", "5e-324", "1.7976931348623157e308",
+    // Boundaries the fast path must decline rather than guess.
+     "1e309", "1e-400", "4.9e-324", "2.2250738585072011e-308",
+    // Long and truncated mantissas.
+     "1234567890123456789", "12345678901234567890", "123456789012345678901234567890",
+    "0.1000000000000000055511151231257827021181583404541015625",
+    // Exact ties and near-ties.
+     "9007199254740993", "0.5", "0.125", "1.0000000000000002",
+    // Leading and trailing zeros.
+     "000123", "0.000000000000000000001", "1000000000000000000000",
+  ]
+  let disagreed = cases.filter(t => !same_bits(t))
+  debug_inspect(disagreed, content="[]")
+}
+
+///|
+test "the float fast path agrees across a systematic sweep" {
+  // A deterministic sweep over mantissas and exponents, covering the table's
+  // whole range including where it hands off to the exact converter.
+  let mut seed = 0x2545F4914F6CDD1DUL
+  let mut checked = 0
+  for _ in 0..<4000 {
+    // xorshift64*, so the sweep is reproducible without an RNG dependency.
+    seed = seed ^ (seed >> 12)
+    seed = seed ^ (seed << 25)
+    seed = seed ^ (seed >> 27)
+    let r = seed * 0x2545F4914F6CDD1DUL
+    // Mantissas up to 19 digits, spanning both the fast path and the
+    // truncated case that must defer to the exact converter.
+    let mantissa = r % 9999999999999999999UL
+    let exponent = (r >> 40).to_int() % 400 - 200
+    let text = "\{mantissa}e\{exponent}"
+    assert_true(same_bits(text))
+    checked = checked + 1
+  }
+  inspect(checked, content="4000")
+}

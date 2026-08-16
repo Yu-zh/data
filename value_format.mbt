@@ -12,7 +12,7 @@
 /// serializer. That keeps at most one compound open per instance, so no
 /// explicit nesting stack is needed and a misplaced `_element` or `_end` call
 /// raises rather than silently corrupting the result.
-pub struct ValueSerializer {
+struct ValueSerializer {
   mut out : Value?
   mut items : Array[Value]?
   mut entries : Array[(Value, Value)]?
@@ -327,7 +327,7 @@ pub impl Serializer for ValueSerializer with fn serialize_struct_variant_end(
 ///
 /// Each nested value gets a child deserializer carrying its own `Path`, so
 /// failures report where in the document they happened.
-pub struct ValueDeserializer {
+struct ValueDeserializer {
   mut value : Value
   mut path : Path
   mut cursor : Int

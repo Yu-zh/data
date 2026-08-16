@@ -61,21 +61,11 @@ pub impl Deserialize for Value
 pub impl Serialize for Value
 pub impl Show for Value
 
-pub struct ValueDeserializer {
-  mut value : Value
-  mut path : Path
-  mut cursor : Int
-}
+type ValueDeserializer
 pub fn ValueDeserializer::new(Value, path? : Path) -> Self
 pub impl Deserializer for ValueDeserializer
 
-pub struct ValueSerializer {
-  mut out : Value?
-  mut items : Array[Value]?
-  mut entries : Array[(Value, Value)]?
-  mut pending_key : Value?
-  mut variant : String?
-}
+type ValueSerializer
 pub fn[T : Serialize] ValueSerializer::capture(T) -> Value raise SerError
 pub fn ValueSerializer::finish(Self) -> Value raise SerError
 pub fn ValueSerializer::new() -> Self

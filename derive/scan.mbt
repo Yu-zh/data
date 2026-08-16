@@ -188,7 +188,7 @@ fn scan_case(
 /// Extracts every `#data.derive(...)` target from one parsed file.
 ///
 /// `where_` is used verbatim as the location prefix of any `DeriveError`.
-pub fn scan(
+fn scan(
   impls : @list.List[@syntax.Impl],
   where_ : String,
 ) -> Array[Target] raise DeriveError {
