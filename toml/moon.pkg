@@ -1,7 +1,9 @@
 import {
   "Yu-zh/data",
+  "moonbitlang/core/buffer",
   "moonbitlang/core/double",
   "moonbitlang/core/string",
+  "moonbitlang/core/encoding/utf8",
 }
 
 // Warning 79 (`implicit_impl_as_method`) is off project-wide; see the root

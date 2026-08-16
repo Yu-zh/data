@@ -377,6 +377,9 @@ test "every value takes its narrowest form" {
 
 ## TOML specifics
 
+The transport is UTF-8 `Bytes`, as it is for JSON — that is what a TOML file is
+on disk — with `to_string` / `from_string` as thin conveniences over it.
+
 TOML is the one format here that cannot stream. Within a table every scalar
 key must appear before the first sub-table header, so field order is not
 emission order: a struct `{ a, sub, b }` has to emit `a`, `b`, then `[sub]`.

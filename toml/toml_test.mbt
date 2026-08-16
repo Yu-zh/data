@@ -330,16 +330,16 @@ test "the serializer type produces what to_string does" {
   let doc : Map[String, Int] = { "a": 1 }
   let s = @toml.TomlSerializer::new()
   @data.Serialize::serialize(doc, s)
-  assert_eq(s.finish(), @toml.to_string(doc))
+  assert_eq(s.finish(), @toml.to_bytes(doc))
 }
 
 ///|
 test "the deserializer type reads what from_string does" {
-  let text = "a = 1\nb = 2\n"
+  let text = b"a = 1\nb = 2\n"
   let d = @toml.TomlDeserializer::new(text)
   let direct : Map[String, Int] = @data.Deserialize::deserialize(d)
   d.finish()
-  assert_eq(direct, (@toml.from_string(text) : Map[String, Int]))
+  assert_eq(direct, (@toml.from_bytes(text) : Map[String, Int]))
 }
 
 ///|
@@ -350,7 +350,7 @@ test "TOML declares itself human-readable" {
     @data.Serializer::is_human_readable(@toml.TomlSerializer::new()),
   )
   assert_true(
-    @data.Deserializer::is_human_readable(@toml.TomlDeserializer::new("")),
+    @data.Deserializer::is_human_readable(@toml.TomlDeserializer::new(b"")),
   )
 }
 
@@ -366,7 +366,7 @@ test "a scalar after a sub-table is hoisted through the trait too" {
   let s = @toml.TomlSerializer::new()
   @data.Serialize::serialize(doc, s)
   inspect(
-    s.finish(),
+    @utf8.decode_lossy(s.finish()),
     content=(
       #|a = 1
       #|b = 3
@@ -376,4 +376,48 @@ test "a scalar after a sub-table is hoisted through the trait too" {
       #|
     ),
   )
+}
+
+// ---- the transport is bytes ----
+
+///|
+/// The point of escaping byte-wise: no byte above ASCII is ever inspected, so
+/// multi-byte UTF-8 passes through the writer untouched and comes back out of
+/// the reader as a borrowed view.
+test "non-ASCII survives without being decoded" {
+  let m : Map[String, String] = { "key": "value with an em dash", "pi": "3.14" }
+  let bytes = @toml.to_bytes(m)
+  assert_eq((@toml.from_bytes(bytes) : Map[String, String]), m)
+}
+
+///|
+test "multi-byte keys and values round-trip through bytes" {
+  let m : Map[String, String] = { "\u{952}": "\u{503C}", "\u{3C0}": "3.14" }
+  let bytes = @toml.to_bytes(m)
+  assert_eq((@toml.from_bytes(bytes) : Map[String, String]), m)
+  // Quoted, because the key is not bare — but its bytes are copied verbatim,
+  // since none of them is below 0x80.
+  assert_true(@utf8.decode_lossy(bytes).contains("\"\u{952}\" = "))
+}
+
+///|
+test "to_string and from_string are conveniences over the bytes" {
+  let m : Map[String, Int] = { "a": 1 }
+  assert_eq(@toml.to_string(m), @utf8.decode_lossy(@toml.to_bytes(m)))
+  let text = "a = 1\n"
+  assert_eq(
+    (@toml.from_string(text) : Map[String, Int]),
+    (@toml.from_bytes(@utf8.encode(text)) : Map[String, Int]),
+  )
+}
+
+///|
+/// Control characters still need escaping, and that path is byte-wise too.
+test "control characters are escaped, everything else copied" {
+  let m : Map[String, String] = { "k": "a\u{01}b\tc" }
+  inspect(@toml.to_string(m), content=(
+    #|k = "a\u0001b\tc"
+    #|
+  ))
+  assert_eq((@toml.from_string(@toml.to_string(m)) : Map[String, String]), m)
 }

@@ -29,11 +29,11 @@ pub fn TomlSerializer::new() -> TomlSerializer {
 }
 
 ///|
-/// The document written so far. Raises if a container was never closed, or if
-/// the value is one TOML cannot spell.
+/// The document written so far, as UTF-8 bytes. Raises if a container was
+/// never closed, or if the value is one TOML cannot spell.
 pub fn TomlSerializer::finish(
   self : TomlSerializer,
-) -> String raise @data.SerError {
+) -> Bytes raise @data.SerError {
   render(self.inner.finish())
 }
 

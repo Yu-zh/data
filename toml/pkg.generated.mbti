@@ -6,7 +6,11 @@ import {
 }
 
 // Values
+pub fn[T : @data.Deserialize] from_bytes(Bytes) -> T raise @data.DeError
+
 pub fn[T : @data.Deserialize] from_string(String) -> T raise @data.DeError
+
+pub fn[T : @data.Serialize] to_bytes(T) -> Bytes raise @data.SerError
 
 pub fn[T : @data.Serialize] to_string(T) -> String raise @data.SerError
 
@@ -15,11 +19,11 @@ pub fn[T : @data.Serialize] to_string(T) -> String raise @data.SerError
 // Types and methods
 type TomlDeserializer
 pub fn TomlDeserializer::finish(Self) -> Unit
-pub fn TomlDeserializer::new(String) -> Self raise @data.DeError
+pub fn TomlDeserializer::new(Bytes) -> Self raise @data.DeError
 pub impl @data.Deserializer for TomlDeserializer
 
 type TomlSerializer
-pub fn TomlSerializer::finish(Self) -> String raise @data.SerError
+pub fn TomlSerializer::finish(Self) -> Bytes raise @data.SerError
 pub fn TomlSerializer::new() -> Self
 pub impl @data.Serializer for TomlSerializer
 

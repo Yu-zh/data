@@ -1,5 +1,8 @@
 // TOML, as a format for the `Yu-zh/data` data model.
 //
+// The transport is UTF-8 `Bytes`, as it is for JSON: that is what a TOML file
+// is on disk. `to_string` / `from_string` are thin conveniences over that.
+//
 // The one format here that cannot stream. Within a table every scalar key must
 // precede the first sub-table header, because a header switches which table
 // subsequent keys belong to — so a struct `{ a, sub, b }` emits `a`, `b`, then
@@ -44,25 +47,41 @@
 // `nan`, so unlike JSON this format does not have to raise on them.
 
 ///|
-/// Serializes any value to a TOML document.
+/// Serializes any value to a TOML document, as UTF-8 bytes.
 ///
 /// The value must be a struct or map at the top level, because a TOML document
 /// is a table.
-pub fn[T : @data.Serialize] to_string(
-  value : T,
-) -> String raise @data.SerError {
+pub fn[T : @data.Serialize] to_bytes(value : T) -> Bytes raise @data.SerError {
   let serializer = TomlSerializer::new()
   value.serialize(serializer)
   serializer.finish()
 }
 
 ///|
-/// Parses a TOML document into any deserializable type.
-pub fn[T : @data.Deserialize] from_string(
-  text : String,
+/// Parses UTF-8 TOML bytes into any deserializable type.
+pub fn[T : @data.Deserialize] from_bytes(
+  input : Bytes,
 ) -> T raise @data.DeError {
-  let deserializer = TomlDeserializer::new(text)
+  let deserializer = TomlDeserializer::new(input)
   let value = @data.Deserialize::deserialize(deserializer)
   deserializer.finish()
   value
+}
+
+///|
+/// `to_bytes`, decoded. Convenient for tests and anywhere a `String` is
+/// wanted; it costs one UTF-8 decode of the whole document.
+pub fn[T : @data.Serialize] to_string(
+  value : T,
+) -> String raise @data.SerError {
+  // Decoding cannot fail: these are bytes this package just produced.
+  @utf8.decode_lossy(to_bytes(value))
+}
+
+///|
+/// `from_bytes`, encoded. Costs one UTF-8 encode of the whole document.
+pub fn[T : @data.Deserialize] from_string(
+  text : String,
+) -> T raise @data.DeError {
+  from_bytes(@utf8.encode(text))
 }

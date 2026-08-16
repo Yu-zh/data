@@ -1,13 +1,18 @@
-// `Value` to TOML text.
+// `Value` to TOML bytes.
 //
 // The reordering this file exists for: within a table, TOML requires every
 // scalar key to appear before the first sub-table header, because a header
 // switches which table subsequent keys belong to. So each table is emitted in
 // three passes — scalars, then sub-tables, then arrays of tables — rather than
 // in the order the fields were declared.
+//
+// Nothing is decoded on the way out. Every character TOML escapes is ASCII,
+// and no byte of a multi-byte UTF-8 sequence is below 0x80, so a string can be
+// escaped byte-wise and everything else copied through verbatim — no `String`
+// is built for a value or a key.
 
 ///|
-fn render(root : @data.Value) -> String raise @data.SerError {
+fn render(root : @data.Value) -> Bytes raise @data.SerError {
   let entries = match root {
     Map(entries) => entries
     other =>
@@ -16,9 +21,16 @@ fn render(root : @data.Value) -> String raise @data.SerError {
         kind="a top-level \{other.type_name()}; a TOML document is a table",
       )
   }
-  let out = StringBuilder::new()
+  let out = Buffer(size_hint=256)
   render_table(out, [], entries)
-  out.to_string()
+  out.to_bytes()
+}
+
+///|
+/// ASCII punctuation and rendered numbers, which are the only `String`s this
+/// file writes.
+fn put(out : @buffer.Buffer, ascii : String) -> Unit {
+  out.write_bytesview(@utf8.encode(ascii)[:])
 }
 
 ///|
@@ -40,8 +52,8 @@ fn is_table_array(value : @data.Value) -> Bool {
 
 ///|
 fn render_table(
-  out : StringBuilder,
-  prefix : Array[String],
+  out : @buffer.Buffer,
+  prefix : Array[BytesView],
   entries : Array[(@data.Value, @data.Value)],
 ) -> Unit raise @data.SerError {
   // Pass one: the scalars, which have to precede any header.
@@ -56,19 +68,19 @@ fn render_table(
     if is_table(value) || is_table_array(value) {
       continue
     }
-    out.write_string(key_text(key))
-    out.write_string(" = ")
+    write_key(out, key)
+    put(out, " = ")
     write_inline(out, value)
-    out.write_string("\n")
+    out.write_byte(b'\n')
   }
   // Pass two: sub-tables.
   for entry in entries {
     let key = table_key(entry.0)
     guard entry.1 is Map(inner) else { continue }
     let path = prefix + [key]
-    out.write_string("\n[")
-    out.write_string(path_text(path))
-    out.write_string("]\n")
+    put(out, "\n[")
+    write_path(out, path)
+    put(out, "]\n")
     render_table(out, path, inner)
   }
   // Pass three: arrays of tables.
@@ -79,88 +91,105 @@ fn render_table(
     let path = prefix + [key]
     for item in items {
       guard item is Map(inner) else { continue }
-      out.write_string("\n[[")
-      out.write_string(path_text(path))
-      out.write_string("]]\n")
+      put(out, "\n[[")
+      write_path(out, path)
+      put(out, "]]\n")
       render_table(out, path, inner)
     }
   }
 }
 
 ///|
-/// A table key, which TOML requires to be text.
-fn table_key(key : @data.Value) -> String raise @data.SerError {
-  match key.text() {
-    Some(text) => text
-    None =>
+/// A table key, which TOML requires to be text. Taken as the bytes the data
+/// model already holds rather than decoded and re-encoded.
+fn table_key(key : @data.Value) -> BytesView raise @data.SerError {
+  match key {
+    Str(raw) => raw
+    other =>
       raise @data.UnsupportedType(
         format="TOML",
-        kind="a non-string table key (\{key.type_name()}); keys are strings",
+        kind="a non-string table key (\{other.type_name()}); keys are strings",
       )
   }
 }
 
 ///|
-fn path_text(path : Array[String]) -> String {
-  let parts = path.map(key_text)
-  parts.join(".")
+fn write_path(out : @buffer.Buffer, path : Array[BytesView]) -> Unit {
+  for i, segment in path {
+    if i > 0 {
+      out.write_byte(b'.')
+    }
+    write_key(out, segment)
+  }
 }
 
 ///|
 /// A bare key where TOML allows one, a quoted key otherwise.
-fn key_text(key : String) -> String {
-  let bare = key.length() > 0 &&
-    key
-    .to_array()
-    .iter()
-    .all(c => {
-      let v = c.to_int()
-      (v >= 0x41 && v <= 0x5A) ||
-      (v >= 0x61 && v <= 0x7A) ||
-      (v >= 0x30 && v <= 0x39) ||
-      v == 0x5F ||
-      v == 0x2D
-    })
-  if bare {
-    key
+fn write_key(out : @buffer.Buffer, key : BytesView) -> Unit {
+  if is_bare_key(key) {
+    out.write_bytesview(key)
   } else {
-    quote(key)
+    write_quoted(out, key)
   }
 }
 
 ///|
-fn quote(text : String) -> String {
-  let out = StringBuilder::new()
-  out.write_char('"')
-  for c in text {
-    match c {
-      '"' => out.write_string("\\\"")
-      '\\' => out.write_string("\\\\")
-      '\n' => out.write_string("\\n")
-      '\r' => out.write_string("\\r")
-      '\t' => out.write_string("\\t")
+fn is_bare_key(key : BytesView) -> Bool {
+  if key.length() == 0 {
+    return false
+  }
+  for b in key.iter() {
+    let v = b.to_int()
+    let ok = (v >= 0x41 && v <= 0x5A) ||
+      (v >= 0x61 && v <= 0x7A) ||
+      (v >= 0x30 && v <= 0x39) ||
+      v == 0x5F ||
+      v == 0x2D
+    if !ok {
+      return false
+    }
+  }
+  true
+}
+
+///|
+fn hex_digit(v : Int) -> Byte {
+  if v < 10 {
+    (0x30 + v).to_byte()
+  } else {
+    (0x61 + v - 10).to_byte()
+  }
+}
+
+///|
+/// A basic string, escaped byte-wise.
+fn write_quoted(out : @buffer.Buffer, raw : BytesView) -> Unit {
+  out.write_byte(b'"')
+  for b in raw.iter() {
+    let v = b.to_int()
+    match v {
+      0x22 => put(out, "\\\"")
+      0x5C => put(out, "\\\\")
+      0x0A => put(out, "\\n")
+      0x0D => put(out, "\\r")
+      0x09 => put(out, "\\t")
       _ =>
-        if c.to_int() < 0x20 {
-          out.write_string("\\u")
-          let hex = "0123456789abcdef".to_array()
-          let v = c.to_int()
-          out.write_char('0')
-          out.write_char('0')
-          out.write_char(hex[(v >> 4) & 0xF])
-          out.write_char(hex[v & 0xF])
+        if v < 0x20 {
+          put(out, "\\u00")
+          out.write_byte(hex_digit((v >> 4) & 0xF))
+          out.write_byte(hex_digit(v & 0xF))
         } else {
-          out.write_char(c)
+          out.write_byte(b)
         }
     }
   }
-  out.write_char('"')
-  out.to_string()
+  out.write_byte(b'"')
 }
 
 ///|
 /// A value in the position where TOML expects one on a single line.
 fn write_inline(
-  out : StringBuilder,
+  out : @buffer.Buffer,
   value : @data.Value,
 ) -> Unit raise @data.SerError {
   match value {
@@ -171,47 +200,42 @@ fn write_inline(
         format="TOML",
         kind="a null inside an array or inline table",
       )
-    Boolean(b) => out.write_string(if b { "true" } else { "false" })
-    Int(v) => out.write_string(v.to_string())
-    UInt(v) => out.write_string(v.to_string())
-    Double(d) => out.write_string(double_text(d))
-    Str(_) =>
-      match value.text() {
-        Some(text) => out.write_string(quote(text))
-        None =>
-          raise @data.SerCustom(message="TOML: a string is not valid UTF-8")
-      }
+    Boolean(b) => put(out, if b { "true" } else { "false" })
+    Int(v) => put(out, v.to_string())
+    UInt(v) => put(out, v.to_string())
+    Double(d) => put(out, double_text(d))
+    Str(raw) => write_quoted(out, raw)
     Bytes(_) =>
       raise @data.UnsupportedType(
         format="TOML",
         kind="a byte string; TOML has no byte type",
       )
     Seq(items) => {
-      out.write_string("[")
+      out.write_byte(b'[')
       for i, item in items {
         if i > 0 {
-          out.write_string(", ")
+          put(out, ", ")
         }
         write_inline(out, item)
       }
-      out.write_string("]")
+      out.write_byte(b']')
     }
     Map(entries) => {
-      out.write_string("{ ")
+      put(out, "{ ")
       let mut first = true
       for entry in entries {
         if entry.1 is Null {
           continue
         }
         if !first {
-          out.write_string(", ")
+          put(out, ", ")
         }
         first = false
-        out.write_string(key_text(table_key(entry.0)))
-        out.write_string(" = ")
+        write_key(out, table_key(entry.0))
+        put(out, " = ")
         write_inline(out, entry.1)
       }
-      out.write_string(" }")
+      put(out, " }")
     }
   }
 }
