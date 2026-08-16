@@ -377,15 +377,20 @@ test "every value takes its narrowest form" {
 
 ## TOML specifics
 
-TOML is the one format here that implements neither `Serializer` nor
-`Deserializer`, and that is what TOML is rather than a shortcut. Within a
-table, every scalar key must appear before the first sub-table header, so field
-order is not emission order: a struct `{ a, sub, b }` has to emit `a`, `b`,
-then `[sub]`. A streaming serializer gets `serialize_field` calls in
-declaration order with no lookahead, so it would have to buffer the whole
-document and reorder at `finish` — at which point it is a `Value` builder
-wearing a trait. So this package is a text codec for `Value` instead, and any
-type with `Serialize` and `Deserialize` still works.
+TOML is the one format here that cannot stream. Within a table every scalar
+key must appear before the first sub-table header, so field order is not
+emission order: a struct `{ a, sub, b }` has to emit `a`, `b`, then `[sub]`.
+And `serialize_field` hands over a value whose only capability is `Serialize`,
+so the serializer cannot tell a scalar from a table without writing it —
+classification has to wait until the whole table is in hand.
+
+That does not put the traits out of reach, because they never required emitting
+as you go: `ValueSerializer` accumulates into a tree and is a first-class
+`Serializer` for doing so. `TomlSerializer` and `TomlDeserializer` are backed by
+it, matching `toml::ser::Serializer` and `toml::de::Deserializer` in Rust.
+Reading is the easier direction — a pull protocol lets a format parse before
+the first question, which it must, since a TOML sub-table may be defined before
+its parent.
 
 ```mbt check
 ///|

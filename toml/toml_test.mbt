@@ -319,3 +319,61 @@ test "a duplicate key is an error rather than a silent overwrite" {
   }
 }
 
+
+// ---- the trait implementations ----
+
+///|
+/// The types exist so TOML can be used wherever a format is expected, not
+/// only through the two free functions. This is the same value written both
+/// ways.
+test "the serializer type produces what to_string does" {
+  let doc : Map[String, Int] = { "a": 1 }
+  let s = @toml.TomlSerializer::new()
+  @data.Serialize::serialize(doc, s)
+  assert_eq(s.finish(), @toml.to_string(doc))
+}
+
+///|
+test "the deserializer type reads what from_string does" {
+  let text = "a = 1\nb = 2\n"
+  let d = @toml.TomlDeserializer::new(text)
+  let direct : Map[String, Int] = @data.Deserialize::deserialize(d)
+  d.finish()
+  assert_eq(direct, (@toml.from_string(text) : Map[String, Int]))
+}
+
+///|
+/// Answered on purpose rather than inherited from `Value`, which returns the
+/// same thing today and might not always.
+test "TOML declares itself human-readable" {
+  assert_true(
+    @data.Serializer::is_human_readable(@toml.TomlSerializer::new()),
+  )
+  assert_true(
+    @data.Deserializer::is_human_readable(@toml.TomlDeserializer::new("")),
+  )
+}
+
+///|
+/// The reordering has to survive going through the trait, not only through
+/// `to_string` — the serializer is where the buffering lives.
+test "a scalar after a sub-table is hoisted through the trait too" {
+  let doc : Map[String, @data.Value] = {
+    "a": Int(1L),
+    "sub": Map([(Str(b"x"), Int(2L))]),
+    "b": Int(3L),
+  }
+  let s = @toml.TomlSerializer::new()
+  @data.Serialize::serialize(doc, s)
+  inspect(
+    s.finish(),
+    content=(
+      #|a = 1
+      #|b = 3
+      #|
+      #|[sub]
+      #|x = 2
+      #|
+    ),
+  )
+}

@@ -1,20 +1,28 @@
 // TOML, as a format for the `Yu-zh/data` data model.
 //
-// The odd one out, and the first that does not implement `Serializer` or
-// `Deserializer` at all. That is not a shortcut — it is what TOML is.
+// The one format here that cannot stream. Within a table every scalar key must
+// precede the first sub-table header, because a header switches which table
+// subsequent keys belong to — so a struct `{ a, sub, b }` emits `a`, `b`, then
+// `[sub]`, and field order is not emission order. Worse, `serialize_field`
+// hands over a `T` whose only capability is `Serialize`: the serializer cannot
+// tell a scalar from a table without writing it, so classification cannot
+// happen until the whole table is in hand.
 //
-// A TOML document cannot be written in one pass. Within a table, every scalar
-// key must appear before any sub-table header, so field order is not emission
-// order: a struct `{ a, sub, b }` has to emit `a`, `b`, then `[sub]`. A
-// streaming `Serializer` receives `serialize_field` calls in declaration order
-// with no way to look ahead, so it would have to buffer the whole document and
-// reorder at `finish` — at which point it is a `Value` builder wearing a trait.
+// That does not put the traits out of reach, because they never required
+// emitting as you go — `ValueSerializer` accumulates into a tree and hands it
+// over at `finish`, and is a first-class `Serializer` for doing so. `toml-rs`
+// reached the same conclusion the long way round: it streamed at first and
+// raised `ValueAfterTable` ("values must be emitted before tables") on any
+// struct whose fields were declared in an order TOML could not express, which
+// pushed the constraint out into users' type definitions. Since 0.6 it builds
+// a document internally instead.
 //
-// So TOML goes through `Value` directly. `@data.to_value` already produces the
-// tree, and `@data.from_value` already consumes one, so this package is a text
-// codec for the data model rather than a protocol over it. Any type with
-// `Serialize` and `Deserialize` still works, which is the only thing a caller
-// cares about.
+// So `TomlSerializer` and `TomlDeserializer` are backed by `ValueSerializer`
+// and `ValueDeserializer`, matching `toml::ser::Serializer` and
+// `toml::de::Deserializer` in Rust. Reading is the easier direction: a pull
+// protocol lets a format parse whatever it likes before the first question, so
+// nothing is bent to fit — which matters, because a TOML sub-table may be
+// defined before its parent and a forward-only reader could not cope.
 //
 // What TOML cannot represent, and what happens:
 //
@@ -43,7 +51,9 @@
 pub fn[T : @data.Serialize] to_string(
   value : T,
 ) -> String raise @data.SerError {
-  render(@data.to_value(value))
+  let serializer = TomlSerializer::new()
+  value.serialize(serializer)
+  serializer.finish()
 }
 
 ///|
@@ -51,5 +61,8 @@ pub fn[T : @data.Serialize] to_string(
 pub fn[T : @data.Deserialize] from_string(
   text : String,
 ) -> T raise @data.DeError {
-  @data.from_value(parse(text))
+  let deserializer = TomlDeserializer::new(text)
+  let value = @data.Deserialize::deserialize(deserializer)
+  deserializer.finish()
+  value
 }

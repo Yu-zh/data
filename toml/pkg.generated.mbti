@@ -13,6 +13,15 @@ pub fn[T : @data.Serialize] to_string(T) -> String raise @data.SerError
 // Errors
 
 // Types and methods
+type TomlDeserializer
+pub fn TomlDeserializer::finish(Self) -> Unit
+pub fn TomlDeserializer::new(String) -> Self raise @data.DeError
+pub impl @data.Deserializer for TomlDeserializer
+
+type TomlSerializer
+pub fn TomlSerializer::finish(Self) -> String raise @data.SerError
+pub fn TomlSerializer::new() -> Self
+pub impl @data.Serializer for TomlSerializer
 
 // Type aliases
 
