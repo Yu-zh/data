@@ -262,9 +262,13 @@ test "arrays of tables round-trip" {
 ///|
 test "a non-table root is refused, because a document is a table" {
   try @toml.to_string(42) catch {
-    e => inspect(e, content=(
-      #|TOML cannot serialize a top-level integer; a TOML document is a table
-    ))
+    e =>
+      inspect(
+        e,
+        content=(
+          #|TOML cannot serialize a top-level integer; a TOML document is a table
+        ),
+      )
   } noraise {
     _ => fail("expected a scalar root to be refused")
   }
@@ -274,9 +278,13 @@ test "a non-table root is refused, because a document is a table" {
 test "byte strings are refused rather than given an invented spelling" {
   let m : Map[String, Bytes] = { "k": b"\x01" }
   try @toml.to_string(m) catch {
-    e => inspect(e, content=(
-      #|TOML cannot serialize a byte string; TOML has no byte type
-    ))
+    e =>
+      inspect(
+        e,
+        content=(
+          #|TOML cannot serialize a byte string; TOML has no byte type
+        ),
+      )
   } noraise {
     _ => fail("expected bytes to be refused")
   }
@@ -286,9 +294,13 @@ test "byte strings are refused rather than given an invented spelling" {
 test "a non-string table key is refused" {
   let m : Map[Int, Int] = { 1: 2 }
   try @toml.to_string(m) catch {
-    e => inspect(e, content=(
-      #|TOML cannot serialize a non-string table key (integer); keys are strings
-    ))
+    e =>
+      inspect(
+        e,
+        content=(
+          #|TOML cannot serialize a non-string table key (integer); keys are strings
+        ),
+      )
   } noraise {
     _ => fail("expected a non-string key to be refused")
   }
@@ -299,10 +311,16 @@ test "a non-string table key is refused" {
 /// string would round-trip into something that is no longer a datetime, so it
 /// is refused with a message that says why.
 test "datetimes are refused rather than coerced" {
-  try (@toml.from_string("when = 1979-05-27T07:32:00Z\n") : Map[String, String]) catch {
-    e => inspect(e, content=(
-      #|$.when: TOML: datetimes are not part of the data model
-    ))
+  try
+    (@toml.from_string("when = 1979-05-27T07:32:00Z\n") : Map[String, String])
+  catch {
+    e =>
+      inspect(
+        e,
+        content=(
+          #|$.when: TOML: datetimes are not part of the data model
+        ),
+      )
   } noraise {
     _ => fail("expected a datetime to be refused")
   }
@@ -311,14 +329,17 @@ test "datetimes are refused rather than coerced" {
 ///|
 test "a duplicate key is an error rather than a silent overwrite" {
   try (@toml.from_string("a = 1\na = 2\n") : Map[String, Int]) catch {
-    e => inspect(e, content=(
-      #|$.a: TOML: duplicate key `a`
-    ))
+    e =>
+      inspect(
+        e,
+        content=(
+          #|$.a: TOML: duplicate key `a`
+        ),
+      )
   } noraise {
     _ => fail("expected a duplicate key to be refused")
   }
 }
-
 
 // ---- the trait implementations ----
 
@@ -346,9 +367,7 @@ test "the deserializer type reads what from_string does" {
 /// Answered on purpose rather than inherited from `Value`, which returns the
 /// same thing today and might not always.
 test "TOML declares itself human-readable" {
-  assert_true(
-    @data.Serializer::is_human_readable(@toml.TomlSerializer::new()),
-  )
+  assert_true(@data.Serializer::is_human_readable(@toml.TomlSerializer::new()))
   assert_true(
     @data.Deserializer::is_human_readable(@toml.TomlDeserializer::new(b"")),
   )
@@ -415,9 +434,12 @@ test "to_string and from_string are conveniences over the bytes" {
 /// Control characters still need escaping, and that path is byte-wise too.
 test "control characters are escaped, everything else copied" {
   let m : Map[String, String] = { "k": "a\u{01}b\tc" }
-  inspect(@toml.to_string(m), content=(
-    #|k = "a\u0001b\tc"
-    #|
-  ))
+  inspect(
+    @toml.to_string(m),
+    content=(
+      #|k = "a\u0001b\tc"
+      #|
+    ),
+  )
   assert_eq((@toml.from_string(@toml.to_string(m)) : Map[String, String]), m)
 }

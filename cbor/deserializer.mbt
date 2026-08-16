@@ -57,9 +57,7 @@ pub fn CborDeserializer::finish(
 // ---- reading heads ----
 
 ///|
-fn CborDeserializer::byte(
-  self : CborDeserializer,
-) -> Byte raise @data.DeError {
+fn CborDeserializer::byte(self : CborDeserializer) -> Byte raise @data.DeError {
   if self.pos >= self.input.length() {
     raise @data.Eof(path=self.path)
   }
@@ -100,9 +98,7 @@ priv struct Head {
 }
 
 ///|
-fn CborDeserializer::head(
-  self : CborDeserializer,
-) -> Head raise @data.DeError {
+fn CborDeserializer::head(self : CborDeserializer) -> Head raise @data.DeError {
   let initial = self.byte().to_int()
   let major = initial >> 5
   let info = initial & 0x1F
@@ -114,7 +110,11 @@ fn CborDeserializer::head(
     27 => { major, arg: self.be(8), indefinite: false }
     _ =>
       if info < 24 {
-        { major, arg: info.to_int64().reinterpret_as_uint64(), indefinite: false }
+        {
+          major,
+          arg: info.to_int64().reinterpret_as_uint64(),
+          indefinite: false,
+        }
       } else {
         raise @data.DeCustom(
           path=self.path,
@@ -227,11 +227,7 @@ fn CborDeserializer::int_in_range(
 ) -> Int64 raise @data.DeError {
   let v = self.as_int64()
   guard v >= low && v <= high else {
-    raise @data.InvalidValue(
-      path=self.path,
-      expected=what,
-      found=v.to_string(),
-    )
+    raise @data.InvalidValue(path=self.path, expected=what, found=v.to_string())
   }
   v
 }
@@ -412,9 +408,7 @@ fn CborDeserializer::open(
 }
 
 ///|
-fn CborDeserializer::top(
-  self : CborDeserializer,
-) -> Scope raise @data.DeError {
+fn CborDeserializer::top(self : CborDeserializer) -> Scope raise @data.DeError {
   match self.scopes.last() {
     Some(scope) => scope
     None =>
@@ -489,9 +483,7 @@ pub impl @data.Deserializer for CborDeserializer with fn deserialize_byte(self) 
 }
 
 ///|
-pub impl @data.Deserializer for CborDeserializer with fn deserialize_int16(
-  self,
-) {
+pub impl @data.Deserializer for CborDeserializer with fn deserialize_int16(self) {
   Int16::from_int64(self.int_in_range(-32768, 32767, "an int16"))
 }
 
@@ -513,9 +505,7 @@ pub impl @data.Deserializer for CborDeserializer with fn deserialize_uint(self) 
 }
 
 ///|
-pub impl @data.Deserializer for CborDeserializer with fn deserialize_int64(
-  self,
-) {
+pub impl @data.Deserializer for CborDeserializer with fn deserialize_int64(self) {
   self.as_int64()
 }
 
@@ -527,9 +517,7 @@ pub impl @data.Deserializer for CborDeserializer with fn deserialize_uint64(
 }
 
 ///|
-pub impl @data.Deserializer for CborDeserializer with fn deserialize_float(
-  self,
-) {
+pub impl @data.Deserializer for CborDeserializer with fn deserialize_float(self) {
   Float::from_double(self.as_double())
 }
 
@@ -570,9 +558,7 @@ pub impl @data.Deserializer for CborDeserializer with fn deserialize_str_bytes(
 }
 
 ///|
-pub impl @data.Deserializer for CborDeserializer with fn deserialize_bytes(
-  self,
-) {
+pub impl @data.Deserializer for CborDeserializer with fn deserialize_bytes(self) {
   Bytes::from_iter(self.blob(BYTES, "bytes").iter())
 }
 
@@ -627,7 +613,11 @@ pub impl @data.Deserializer for CborDeserializer with fn deserialize_tuple_begin
   }
   self.scopes.push({
     base: self.path,
-    remaining: if h.indefinite { INDEFINITE } else { len },
+    remaining: if h.indefinite {
+      INDEFINITE
+    } else {
+      len
+    },
     count: 0,
     expected: [],
   })
@@ -661,7 +651,6 @@ pub impl @data.Deserializer for CborDeserializer with fn deserialize_tuple_end(
       )
     }
     let _ = self.byte()
-
   }
 }
 
@@ -696,7 +685,6 @@ pub impl @data.Deserializer for CborDeserializer with fn deserialize_struct_begi
   fields,
 ) {
   let _ = self.open(MAP, "map", fields)
-
 }
 
 ///|
@@ -733,7 +721,6 @@ pub impl @data.Deserializer for CborDeserializer with fn deserialize_field_value
 /// was meant to be.
 pub impl @data.Deserializer for CborDeserializer with fn skip_value(self) {
   let _ = self.parse_any()
-
 }
 
 // ---- enums ----
@@ -745,7 +732,7 @@ pub impl @data.Deserializer for CborDeserializer with fn deserialize_enum_begin(
   variants,
 ) {
   let base = self.path
-  let wrapped = (self.peek_byte().to_int() >> 5) == MAP
+  let wrapped = self.peek_byte().to_int() >> 5 == MAP
   if wrapped {
     let h = self.expect_head(MAP, "map")
     guard !h.indefinite && h.arg == 1 else {
@@ -834,7 +821,6 @@ fn CborDeserializer::parse_any(
           items.push(self.parse_any())
         }
         let _ = self.byte()
-
       } else {
         for _ in 0U..<h.arg.to_uint() {
           items.push(self.parse_any())
@@ -850,7 +836,6 @@ fn CborDeserializer::parse_any(
           entries.push((k, self.parse_any()))
         }
         let _ = self.byte()
-
       } else {
         for _ in 0U..<h.arg.to_uint() {
           let k = self.parse_any()

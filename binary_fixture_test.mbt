@@ -103,7 +103,8 @@ fn BinSerializer::count(
     Some(n) => self.u32(n.reinterpret_as_uint())
     None =>
       raise @data.UnsupportedType(
-        format="bin", kind="a sequence of unknown length",
+        format="bin",
+        kind="a sequence of unknown length",
       )
   }
 }
@@ -383,9 +384,7 @@ fn BinDeserializer::new(input : Bytes) -> BinDeserializer {
 }
 
 ///|
-fn BinDeserializer::finish(
-  self : BinDeserializer,
-) -> Unit raise @data.DeError {
+fn BinDeserializer::finish(self : BinDeserializer) -> Unit raise @data.DeError {
   if self.pos < self.input.length() {
     raise @data.DeCustom(path=Root, message="bin: trailing input after value")
   }
@@ -491,7 +490,9 @@ impl @data.Deserializer for BinDeserializer with fn deserialize_byte(self) {
 ///|
 impl @data.Deserializer for BinDeserializer with fn deserialize_int16(self) {
   let raw = self.u16()
-  Int16::from_int64((if raw >= 0x8000 { raw - 0x10000 } else { raw }).to_int64())
+  Int16::from_int64(
+    (if raw >= 0x8000 { raw - 0x10000 } else { raw }).to_int64(),
+  )
 }
 
 ///|
@@ -547,7 +548,8 @@ impl @data.Deserializer for BinDeserializer with fn deserialize_char(self) {
 impl @data.Deserializer for BinDeserializer with fn deserialize_string(self) {
   let view = self.blob()
   @utf8.decode(view) catch {
-    _ => raise @data.InvalidValue(path=Root, expected="UTF-8", found="raw bytes")
+    _ =>
+      raise @data.InvalidValue(path=Root, expected="UTF-8", found="raw bytes")
   }
 }
 
@@ -588,7 +590,10 @@ impl @data.Deserializer for BinDeserializer with fn deserialize_seq_begin(self) 
 impl @data.Deserializer for BinDeserializer with fn deserialize_seq_next(self) {
   let top = self.counts.length() - 1
   guard top >= 0 else {
-    raise @data.DeCustom(path=Root, message="bin: sequence item outside a sequence")
+    raise @data.DeCustom(
+      path=Root,
+      message="bin: sequence item outside a sequence",
+    )
   }
   if self.counts[top] == 0 {
     let _ = self.counts.pop()
@@ -794,7 +799,8 @@ test "a struct with no label is shorter by exactly the absent payload" {
 test "an enum travels as a bare variant index" {
   assert_eq(bin_to_bytes(Shape::Empty), b"\x00\x00\x00\x00")
   assert_eq(bin_to_bytes(Shape::Circle(1.0)).length(), 4 + 8)
-  for shape in [
+  for
+    shape in [
       Shape::Empty,
       Shape::Circle(2.5),
       Shape::Rect(1.0, 2.0),
@@ -808,9 +814,13 @@ test "an enum travels as a bare variant index" {
 test "a variant index outside the type's variants is rejected" {
   let bad : Bytes = b"\x63\x00\x00\x00"
   try (bin_from_bytes(bad) : Shape) catch {
-    e => inspect(e, content=(
-      #|$: unknown variant `99`, expected one of Empty, Circle, Rect, Tagged
-    ))
+    e =>
+      inspect(
+        e,
+        content=(
+          #|$: unknown variant `99`, expected one of Empty, Circle, Rect, Tagged
+        ),
+      )
   } noraise {
     _ => fail("expected an unknown-variant error")
   }
@@ -822,9 +832,13 @@ test "a variant index outside the type's variants is rejected" {
 test "deserialize_any is impossible and says so" {
   let bytes = bin_to_bytes(42)
   try (bin_from_bytes(bytes) : @data.Value) catch {
-    e => inspect(e, content=(
-      #|$: bin: not self-describing, deserialize_any is impossible
-    ))
+    e =>
+      inspect(
+        e,
+        content=(
+          #|$: bin: not self-describing, deserialize_any is impossible
+        ),
+      )
   } noraise {
     _ => fail("expected deserialize_any to be refused")
   }
@@ -845,9 +859,13 @@ test "the format declares itself unreadable by people" {
 test "a length prefix larger than the input is refused" {
   let hostile : Bytes = b"\xff\xff\xff\x7f\x01\x02"
   try (bin_from_bytes(hostile) : Array[Int]) catch {
-    e => inspect(e, content=(
-      #|$: bin: length 2147483647 exceeds the 2 byte(s) remaining
-    ))
+    e =>
+      inspect(
+        e,
+        content=(
+          #|$: bin: length 2147483647 exceeds the 2 byte(s) remaining
+        ),
+      )
   } noraise {
     _ => fail("expected a hostile length to be refused")
   }
@@ -857,9 +875,13 @@ test "a length prefix larger than the input is refused" {
 test "trailing input is an error, as it is for JSON" {
   let bytes = b"\x2a\x00\x00\x00\x99"
   try (bin_from_bytes(bytes) : Int) catch {
-    e => inspect(e, content=(
-      #|$: bin: trailing input after value
-    ))
+    e =>
+      inspect(
+        e,
+        content=(
+          #|$: bin: trailing input after value
+        ),
+      )
   } noraise {
     _ => fail("expected trailing input to be refused")
   }

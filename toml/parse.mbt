@@ -493,14 +493,13 @@ fn Parser::value(
   // A bare token: boolean, number, or something TOML has that we do not. It is
   // ASCII by construction and short, so decoding it costs nothing.
   let start = self.pos
-  while
-    !self.done() &&
-    self.peek() != 0x2C &&
-    self.peek() != 0x5D &&
-    self.peek() != 0x7D &&
-    self.peek() != 0x0A &&
-    self.peek() != 0x0D &&
-    self.peek() != 0x23 {
+  while !self.done() &&
+        self.peek() != 0x2C &&
+        self.peek() != 0x5D &&
+        self.peek() != 0x7D &&
+        self.peek() != 0x0A &&
+        self.peek() != 0x0D &&
+        self.peek() != 0x23 {
     self.bump()
   }
   scalar(decode(self.src[start:self.pos]).trim().to_owned(), at)
@@ -545,7 +544,8 @@ fn scalar(text : String, at : @data.Path) -> @data.Value raise @data.DeError {
   } else {
     @data.Int(
       @string.parse_int64(cleaned) catch {
-        _ => raise @data.InvalidValue(path=at, expected="an integer", found=text)
+        _ =>
+          raise @data.InvalidValue(path=at, expected="an integer", found=text)
       },
     )
   }

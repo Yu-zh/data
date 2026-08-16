@@ -172,10 +172,7 @@ pub impl @data.Serializer for MsgpackSerializer with fn serialize_byte(self, v) 
 }
 
 ///|
-pub impl @data.Serializer for MsgpackSerializer with fn serialize_int16(
-  self,
-  v,
-) {
+pub impl @data.Serializer for MsgpackSerializer with fn serialize_int16(self, v) {
   self.int(v.to_int().to_int64())
 }
 
@@ -198,10 +195,7 @@ pub impl @data.Serializer for MsgpackSerializer with fn serialize_uint(self, v) 
 }
 
 ///|
-pub impl @data.Serializer for MsgpackSerializer with fn serialize_int64(
-  self,
-  v,
-) {
+pub impl @data.Serializer for MsgpackSerializer with fn serialize_int64(self, v) {
   self.int(v)
 }
 
@@ -214,10 +208,7 @@ pub impl @data.Serializer for MsgpackSerializer with fn serialize_uint64(
 }
 
 ///|
-pub impl @data.Serializer for MsgpackSerializer with fn serialize_float(
-  self,
-  v,
-) {
+pub impl @data.Serializer for MsgpackSerializer with fn serialize_float(self, v) {
   self.put(0xca)
   self.be(v.reinterpret_as_uint().to_uint64(), 4)
 }
@@ -256,10 +247,7 @@ pub impl @data.Serializer for MsgpackSerializer with fn serialize_str_bytes(
 ///|
 /// A `bin`, not an array of numbers. The distinction JSON cannot make and
 /// MessagePack gained in 2013 precisely because it mattered.
-pub impl @data.Serializer for MsgpackSerializer with fn serialize_bytes(
-  self,
-  v,
-) {
+pub impl @data.Serializer for MsgpackSerializer with fn serialize_bytes(self, v) {
   self.blob(v[:], -1, 0, 0xc4, 0xc5, 0xc6)
 }
 
@@ -309,9 +297,7 @@ pub impl @data.Serializer for MsgpackSerializer with fn serialize_seq_element(
 }
 
 ///|
-pub impl @data.Serializer for MsgpackSerializer with fn serialize_seq_end(
-  _self,
-) {
+pub impl @data.Serializer for MsgpackSerializer with fn serialize_seq_end(_self) {
 
 }
 
@@ -340,9 +326,7 @@ pub impl @data.Serializer for MsgpackSerializer with fn serialize_map_value(
 }
 
 ///|
-pub impl @data.Serializer for MsgpackSerializer with fn serialize_map_end(
-  _self,
-) {
+pub impl @data.Serializer for MsgpackSerializer with fn serialize_map_end(_self) {
 
 }
 
@@ -409,8 +393,6 @@ pub impl @data.Serializer for MsgpackSerializer with fn serialize_struct_variant
 }
 
 ///|
-pub impl @data.Serializer for MsgpackSerializer with fn is_human_readable(
-  _self,
-) {
+pub impl @data.Serializer for MsgpackSerializer with fn is_human_readable(_self) {
   false
 }

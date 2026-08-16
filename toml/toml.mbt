@@ -71,9 +71,7 @@ pub fn[T : @data.Deserialize] from_bytes(
 ///|
 /// `to_bytes`, decoded. Convenient for tests and anywhere a `String` is
 /// wanted; it costs one UTF-8 decode of the whole document.
-pub fn[T : @data.Serialize] to_string(
-  value : T,
-) -> String raise @data.SerError {
+pub fn[T : @data.Serialize] to_string(value : T) -> String raise @data.SerError {
   // Decoding cannot fail: these are bytes this package just produced.
   @utf8.decode_lossy(to_bytes(value))
 }

@@ -160,9 +160,13 @@ test "an extension type is refused rather than guessed at" {
   // fixext1: type 5, one byte of payload.
   let ext = unhex("d40501")
   try (@msgpack.from_bytes(ext) : @data.Value) catch {
-    e => inspect(e, content=(
-      #|$: MessagePack: extension types are not part of the data model
-    ))
+    e =>
+      inspect(
+        e,
+        content=(
+          #|$: MessagePack: extension types are not part of the data model
+        ),
+      )
   } noraise {
     _ => fail("expected an extension to be refused")
   }
@@ -175,9 +179,13 @@ test "an extension type is refused rather than guessed at" {
 test "a sequence of unknown length cannot be written" {
   let s = @msgpack.MsgpackSerializer::new()
   try @data.Serializer::serialize_seq_begin(s, None) catch {
-    e => inspect(e, content=(
-      #|MessagePack cannot serialize a sequence of unknown length
-    ))
+    e =>
+      inspect(
+        e,
+        content=(
+          #|MessagePack cannot serialize a sequence of unknown length
+        ),
+      )
   } noraise {
     _ => fail("expected an unknown length to be refused")
   }
@@ -187,9 +195,13 @@ test "a sequence of unknown length cannot be written" {
 test "a length longer than the input is refused rather than allocated" {
   let hostile = unhex("dbffffffff")
   try (@msgpack.from_bytes(hostile) : String) catch {
-    e => inspect(e, content=(
-      #|$: MessagePack: length 4294967295 exceeds the 0 byte(s) remaining
-    ))
+    e =>
+      inspect(
+        e,
+        content=(
+          #|$: MessagePack: length 4294967295 exceeds the 0 byte(s) remaining
+        ),
+      )
   } noraise {
     _ => fail("expected a hostile length to be refused")
   }
@@ -198,9 +210,13 @@ test "a length longer than the input is refused rather than allocated" {
 ///|
 test "trailing input is refused" {
   try (@msgpack.from_bytes(unhex("0101")) : Int) catch {
-    e => inspect(e, content=(
-      #|$: trailing input after value
-    ))
+    e =>
+      inspect(
+        e,
+        content=(
+          #|$: trailing input after value
+        ),
+      )
   } noraise {
     _ => fail("expected trailing input to be refused")
   }
@@ -334,7 +350,8 @@ test "structs are maps with string keys" {
 ///|
 test "every enum variant shape round-trips, externally tagged" {
   inspect(hex(@msgpack.to_bytes(Shape::Empty)), content="a5456d707479")
-  for shape in [
+  for
+    shape in [
       Shape::Empty,
       Shape::Circle(2.5),
       Shape::Rect(1.0, 2.0),
@@ -347,9 +364,7 @@ test "every enum variant shape round-trips, externally tagged" {
 ///|
 test "unknown fields are skipped, which a self-describing format can do" {
   // A Point with an extra key holding a nested array.
-  let with_extra = unhex(
-    "84a17801a17902a56c6162656cc0a5657874726193010203",
-  )
+  let with_extra = unhex("84a17801a17902a56c6162656cc0a5657874726193010203")
   assert_eq((@msgpack.from_bytes(with_extra) : Point), Point::{
     x: 1,
     y: 2,
@@ -363,6 +378,8 @@ test "the format declares itself unreadable by people" {
     @data.Serializer::is_human_readable(@msgpack.MsgpackSerializer::new()),
   )
   assert_false(
-    @data.Deserializer::is_human_readable(@msgpack.MsgpackDeserializer::new(b"")),
+    @data.Deserializer::is_human_readable(
+      @msgpack.MsgpackDeserializer::new(b""),
+    ),
   )
 }

@@ -58,11 +58,7 @@ pub fn CborSerializer::finish(
 ///|
 /// `count` bytes of `arg`, most significant first. CBOR is big-endian
 /// throughout, unlike most binary formats.
-fn CborSerializer::be(
-  self : CborSerializer,
-  arg : UInt64,
-  count : Int,
-) -> Unit {
+fn CborSerializer::be(self : CborSerializer, arg : UInt64, count : Int) -> Unit {
   for i = count - 1; i >= 0; i = i - 1 {
     self.out.write_byte((arg >> (i * 8)).to_uint().to_byte())
   }

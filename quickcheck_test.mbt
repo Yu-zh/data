@@ -151,18 +151,18 @@ test "P1: doubles round-trip through Value across the whole bit space" {
 test "P1: containers round-trip through Value" {
   @quickcheck.check((x : Int?) => @data.from_value(@data.to_value(x)) == x)
   @quickcheck.check((x : Array[Int]) => @data.from_value(@data.to_value(x)) == x)
-  @quickcheck.check(
-    (x : Array[String]) => @data.from_value(@data.to_value(x)) == x,
-  )
-  @quickcheck.check(
-    (x : Array[Array[Int]]) => @data.from_value(@data.to_value(x)) == x,
-  )
-  @quickcheck.check(
-    (x : (Int, String)) => @data.from_value(@data.to_value(x)) == x,
-  )
-  @quickcheck.check(
-    (x : (Bool, Int, String)) => @data.from_value(@data.to_value(x)) == x,
-  )
+  @quickcheck.check((x : Array[String]) => {
+    @data.from_value(@data.to_value(x)) == x
+  })
+  @quickcheck.check((x : Array[Array[Int]]) => {
+    @data.from_value(@data.to_value(x)) == x
+  })
+  @quickcheck.check((x : (Int, String)) => {
+    @data.from_value(@data.to_value(x)) == x
+  })
+  @quickcheck.check((x : (Bool, Int, String)) => {
+    @data.from_value(@data.to_value(x)) == x
+  })
 }
 
 ///|
@@ -201,18 +201,18 @@ test "P2: doubles round-trip through JSON across the whole bit space" {
 test "P2: containers round-trip through JSON" {
   @quickcheck.check((x : Int?) => @json.from_bytes(@json.to_bytes(x)) == x)
   @quickcheck.check((x : Array[Int]) => @json.from_bytes(@json.to_bytes(x)) == x)
-  @quickcheck.check(
-    (x : Array[String]) => @json.from_bytes(@json.to_bytes(x)) == x,
-  )
-  @quickcheck.check(
-    (x : Array[Array[Int]]) => @json.from_bytes(@json.to_bytes(x)) == x,
-  )
-  @quickcheck.check(
-    (x : (Int, String)) => @json.from_bytes(@json.to_bytes(x)) == x,
-  )
-  @quickcheck.check(
-    (x : (Bool, Int, String)) => @json.from_bytes(@json.to_bytes(x)) == x,
-  )
+  @quickcheck.check((x : Array[String]) => {
+    @json.from_bytes(@json.to_bytes(x)) == x
+  })
+  @quickcheck.check((x : Array[Array[Int]]) => {
+    @json.from_bytes(@json.to_bytes(x)) == x
+  })
+  @quickcheck.check((x : (Int, String)) => {
+    @json.from_bytes(@json.to_bytes(x)) == x
+  })
+  @quickcheck.check((x : (Bool, Int, String)) => {
+    @json.from_bytes(@json.to_bytes(x)) == x
+  })
 }
 
 ///|
@@ -241,7 +241,9 @@ fn[T : @data.Serialize + @data.Deserialize + Eq] agree(x : T) -> Bool raise {
 ///
 /// Separate from `agree` for the same reason `agree` has annotations: both
 /// entry points are generic in their return type.
-fn[T : @data.Serialize + @data.Deserialize + Eq] bin_agrees(x : T) -> Bool raise {
+fn[T : @data.Serialize + @data.Deserialize + Eq] bin_agrees(
+  x : T,
+) -> Bool raise {
   let through_bin : T = bin_from_bytes(bin_to_bytes(x))
   let through_json : T = @json.from_bytes(@json.to_bytes(x))
   through_bin == through_json
@@ -281,13 +283,13 @@ test "P2: values round-trip through the binary fixture" {
   @quickcheck.check((x : Bytes) => bin_from_bytes(bin_to_bytes(x)) == x)
   @quickcheck.check((x : Int?) => bin_from_bytes(bin_to_bytes(x)) == x)
   @quickcheck.check((x : Array[Int]) => bin_from_bytes(bin_to_bytes(x)) == x)
-  @quickcheck.check(
-    (x : Array[Array[String]]) => bin_from_bytes(bin_to_bytes(x)) == x,
-  )
+  @quickcheck.check((x : Array[Array[String]]) => {
+    bin_from_bytes(bin_to_bytes(x)) == x
+  })
   @quickcheck.check((x : (Int, String)) => bin_from_bytes(bin_to_bytes(x)) == x)
-  @quickcheck.check(
-    (x : (Bool, Int, String)) => bin_from_bytes(bin_to_bytes(x)) == x,
-  )
+  @quickcheck.check((x : (Bool, Int, String)) => {
+    bin_from_bytes(bin_to_bytes(x)) == x
+  })
   @quickcheck.check((x : Point) => bin_from_bytes(bin_to_bytes(x)) == x)
   @quickcheck.check((x : Shape) => bin_from_bytes(bin_to_bytes(x)) == x)
 }
@@ -352,15 +354,15 @@ test "P2: values round-trip through CBOR" {
   @quickcheck.check((x : Bytes) => @cbor.from_bytes(@cbor.to_bytes(x)) == x)
   @quickcheck.check((x : Int?) => @cbor.from_bytes(@cbor.to_bytes(x)) == x)
   @quickcheck.check((x : Array[Int]) => @cbor.from_bytes(@cbor.to_bytes(x)) == x)
-  @quickcheck.check(
-    (x : Array[Array[String]]) => @cbor.from_bytes(@cbor.to_bytes(x)) == x,
-  )
-  @quickcheck.check(
-    (x : (Int, String)) => @cbor.from_bytes(@cbor.to_bytes(x)) == x,
-  )
-  @quickcheck.check(
-    (x : (Bool, Int, String)) => @cbor.from_bytes(@cbor.to_bytes(x)) == x,
-  )
+  @quickcheck.check((x : Array[Array[String]]) => {
+    @cbor.from_bytes(@cbor.to_bytes(x)) == x
+  })
+  @quickcheck.check((x : (Int, String)) => {
+    @cbor.from_bytes(@cbor.to_bytes(x)) == x
+  })
+  @quickcheck.check((x : (Bool, Int, String)) => {
+    @cbor.from_bytes(@cbor.to_bytes(x)) == x
+  })
   @quickcheck.check((x : Point) => @cbor.from_bytes(@cbor.to_bytes(x)) == x)
   @quickcheck.check((x : Shape) => @cbor.from_bytes(@cbor.to_bytes(x)) == x)
 }
@@ -403,31 +405,35 @@ test "P2: values round-trip through MessagePack" {
   @quickcheck.check((x : Byte) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x)
   @quickcheck.check((x : Int) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x)
   @quickcheck.check((x : UInt) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x)
-  @quickcheck.check(
-    (x : Int64) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x,
-  )
-  @quickcheck.check(
-    (x : UInt64) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x,
-  )
+  @quickcheck.check((x : Int64) => {
+    @msgpack.from_bytes(@msgpack.to_bytes(x)) == x
+  })
+  @quickcheck.check((x : UInt64) => {
+    @msgpack.from_bytes(@msgpack.to_bytes(x)) == x
+  })
   @quickcheck.check((x : Char) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x)
-  @quickcheck.check(
-    (x : String) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x,
-  )
-  @quickcheck.check(
-    (x : Bytes) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x,
-  )
+  @quickcheck.check((x : String) => {
+    @msgpack.from_bytes(@msgpack.to_bytes(x)) == x
+  })
+  @quickcheck.check((x : Bytes) => {
+    @msgpack.from_bytes(@msgpack.to_bytes(x)) == x
+  })
   @quickcheck.check((x : Int?) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x)
-  @quickcheck.check(
-    (x : Array[Int]) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x,
-  )
-  @quickcheck.check(
-    (x : Array[Array[String]]) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x,
-  )
-  @quickcheck.check(
-    (x : (Int, String)) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x,
-  )
-  @quickcheck.check((x : Point) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x)
-  @quickcheck.check((x : Shape) => @msgpack.from_bytes(@msgpack.to_bytes(x)) == x)
+  @quickcheck.check((x : Array[Int]) => {
+    @msgpack.from_bytes(@msgpack.to_bytes(x)) == x
+  })
+  @quickcheck.check((x : Array[Array[String]]) => {
+    @msgpack.from_bytes(@msgpack.to_bytes(x)) == x
+  })
+  @quickcheck.check((x : (Int, String)) => {
+    @msgpack.from_bytes(@msgpack.to_bytes(x)) == x
+  })
+  @quickcheck.check((x : Point) => {
+    @msgpack.from_bytes(@msgpack.to_bytes(x)) == x
+  })
+  @quickcheck.check((x : Shape) => {
+    @msgpack.from_bytes(@msgpack.to_bytes(x)) == x
+  })
 }
 
 ///|

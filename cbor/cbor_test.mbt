@@ -58,9 +58,18 @@ test "integers encode as the RFC's examples" {
 
 ///|
 test "the integer boundaries encode without overflowing" {
-  inspect(hex(@cbor.to_bytes(18446744073709551615UL)), content="1bffffffffffffffff")
-  inspect(hex(@cbor.to_bytes(-9223372036854775808L)), content="3b7fffffffffffffff")
-  inspect(hex(@cbor.to_bytes(9223372036854775807L)), content="1b7fffffffffffffff")
+  inspect(
+    hex(@cbor.to_bytes(18446744073709551615UL)),
+    content="1bffffffffffffffff",
+  )
+  inspect(
+    hex(@cbor.to_bytes(-9223372036854775808L)),
+    content="3b7fffffffffffffff",
+  )
+  inspect(
+    hex(@cbor.to_bytes(9223372036854775807L)),
+    content="1b7fffffffffffffff",
+  )
 }
 
 ///|
@@ -101,8 +110,12 @@ test "arrays and maps encode as the RFC's examples" {
   inspect(hex(@cbor.to_bytes(([] : Array[Int]))), content="80")
   inspect(hex(@cbor.to_bytes([1, 2, 3])), content="83010203")
   inspect(
-    hex(@cbor.to_bytes([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
-      17, 18, 19, 20, 21, 22, 23, 24, 25])),
+    hex(
+      @cbor.to_bytes([
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
+        22, 23, 24, 25,
+      ]),
+    ),
     content="98190102030405060708090a0b0c0d0e0f101112131415161718181819",
   )
 }
@@ -155,16 +168,17 @@ test "single precision decodes as itself" {
 /// Written by other encoders for streaming, never by this one. The decoder has
 /// to accept them or it cannot read what it is meant to interoperate with.
 test "indefinite-length containers decode" {
-  assert_eq((@cbor.from_bytes(unhex("9f018202039f0405ffff")) : @data.Value), Seq([
-    UInt(1),
-    Seq([UInt(2), UInt(3)]),
-    Seq([UInt(4), UInt(5)]),
-  ]))
+  assert_eq(
+    (@cbor.from_bytes(unhex("9f018202039f0405ffff")) : @data.Value),
+    Seq([UInt(1), Seq([UInt(2), UInt(3)]), Seq([UInt(4), UInt(5)])]),
+  )
   assert_eq((@cbor.from_bytes(unhex("9f010203ff")) : Array[Int]), [1, 2, 3])
-  assert_eq((@cbor.from_bytes(unhex("bf61610161628202 03ff".replace(old=" ", new=""))) : @data.Value), Map([
-    (Str(b"a"), UInt(1)),
-    (Str(b"b"), Seq([UInt(2), UInt(3)])),
-  ]))
+  assert_eq(
+    (
+      @cbor.from_bytes(unhex("bf61610161628202 03ff".replace(old=" ", new=""))) :
+      @data.Value),
+    Map([(Str(b"a"), UInt(1)), (Str(b"b"), Seq([UInt(2), UInt(3)]))]),
+  )
 }
 
 ///|
@@ -189,7 +203,9 @@ test "semantic tags are stepped over" {
   assert_eq((@cbor.from_bytes(unhex("c11a514b67b0")) : Int), 1363896240)
   // Tag 0 (date string) wrapping text.
   assert_eq(
-    (@cbor.from_bytes(unhex("c074323031332d30332d32315432303a30343a30305a")) : String),
+    (
+      @cbor.from_bytes(unhex("c074323031332d30332d32315432303a30343a30305a")) :
+      String),
     "2013-03-21T20:04:00Z",
   )
 }
@@ -322,8 +338,12 @@ test "structs are maps with text keys" {
 ///|
 test "every enum variant shape round-trips, externally tagged" {
   inspect(hex(@cbor.to_bytes(Shape::Empty)), content="65456d707479")
-  inspect(hex(@cbor.to_bytes(Shape::Circle(1.5))), content="a166436972636c65fb3ff8000000000000")
-  for shape in [
+  inspect(
+    hex(@cbor.to_bytes(Shape::Circle(1.5))),
+    content="a166436972636c65fb3ff8000000000000",
+  )
+  for
+    shape in [
       Shape::Empty,
       Shape::Circle(2.5),
       Shape::Rect(1.0, 2.0),
@@ -350,9 +370,13 @@ test "unknown fields are skipped, which a self-describing format can do" {
 test "an unknown variant names the ones that exist" {
   let bad = @cbor.to_bytes("Nope")
   try (@cbor.from_bytes(bad) : Shape) catch {
-    e => inspect(e, content=(
-      #|$: unknown variant `Nope`, expected one of Empty, Circle, Rect, Tagged
-    ))
+    e =>
+      inspect(
+        e,
+        content=(
+          #|$: unknown variant `Nope`, expected one of Empty, Circle, Rect, Tagged
+        ),
+      )
   } noraise {
     _ => fail("expected an unknown-variant error")
   }
@@ -362,9 +386,13 @@ test "an unknown variant names the ones that exist" {
 test "trailing input is refused" {
   let bytes = unhex("0101")
   try (@cbor.from_bytes(bytes) : Int) catch {
-    e => inspect(e, content=(
-      #|$: trailing input after value
-    ))
+    e =>
+      inspect(
+        e,
+        content=(
+          #|$: trailing input after value
+        ),
+      )
   } noraise {
     _ => fail("expected trailing input to be refused")
   }
@@ -375,9 +403,13 @@ test "a length longer than the input is refused rather than allocated" {
   // A text string claiming 2^32-1 bytes with none following.
   let hostile = unhex("7affffffff")
   try (@cbor.from_bytes(hostile) : String) catch {
-    e => inspect(e, content=(
-      #|$: CBOR: length 4294967295 exceeds the 0 byte(s) remaining
-    ))
+    e =>
+      inspect(
+        e,
+        content=(
+          #|$: CBOR: length 4294967295 exceeds the 0 byte(s) remaining
+        ),
+      )
   } noraise {
     _ => fail("expected a hostile length to be refused")
   }

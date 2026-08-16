@@ -718,9 +718,7 @@ pub impl Deserializer for ValueDeserializer with fn deserialize_tuple_begin(
 }
 
 ///|
-pub impl Deserializer for ValueDeserializer with fn deserialize_tuple_next(
-  self,
-) {
+pub impl Deserializer for ValueDeserializer with fn deserialize_tuple_next(self) {
   match self.deserialize_seq_next() {
     Some(v) => v
     None => raise Eof(path=self.path)
@@ -728,9 +726,7 @@ pub impl Deserializer for ValueDeserializer with fn deserialize_tuple_next(
 }
 
 ///|
-pub impl Deserializer for ValueDeserializer with fn deserialize_tuple_end(
-  _self,
-) {
+pub impl Deserializer for ValueDeserializer with fn deserialize_tuple_end(_self) {
 
 }
 

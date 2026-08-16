@@ -178,7 +178,6 @@ test "all four variant shapes" {
       #|  value
       #|}
       #|
-
     ),
   )
 }

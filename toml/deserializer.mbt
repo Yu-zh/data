@@ -64,9 +64,7 @@ pub impl @data.Deserializer for TomlDeserializer with fn deserialize_byte(self) 
 }
 
 ///|
-pub impl @data.Deserializer for TomlDeserializer with fn deserialize_int16(
-  self,
-) {
+pub impl @data.Deserializer for TomlDeserializer with fn deserialize_int16(self) {
   @data.Deserializer::deserialize_int16(self.inner)
 }
 
@@ -88,9 +86,7 @@ pub impl @data.Deserializer for TomlDeserializer with fn deserialize_uint(self) 
 }
 
 ///|
-pub impl @data.Deserializer for TomlDeserializer with fn deserialize_int64(
-  self,
-) {
+pub impl @data.Deserializer for TomlDeserializer with fn deserialize_int64(self) {
   @data.Deserializer::deserialize_int64(self.inner)
 }
 
@@ -102,9 +98,7 @@ pub impl @data.Deserializer for TomlDeserializer with fn deserialize_uint64(
 }
 
 ///|
-pub impl @data.Deserializer for TomlDeserializer with fn deserialize_float(
-  self,
-) {
+pub impl @data.Deserializer for TomlDeserializer with fn deserialize_float(self) {
   @data.Deserializer::deserialize_float(self.inner)
 }
 
@@ -135,9 +129,7 @@ pub impl @data.Deserializer for TomlDeserializer with fn deserialize_str_bytes(
 }
 
 ///|
-pub impl @data.Deserializer for TomlDeserializer with fn deserialize_bytes(
-  self,
-) {
+pub impl @data.Deserializer for TomlDeserializer with fn deserialize_bytes(self) {
   @data.Deserializer::deserialize_bytes(self.inner)
 }
 

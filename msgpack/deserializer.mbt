@@ -99,10 +99,7 @@ fn MsgpackDeserializer::bounded(
 }
 
 ///|
-fn MsgpackDeserializer::take(
-  self : MsgpackDeserializer,
-  n : Int,
-) -> BytesView {
+fn MsgpackDeserializer::take(self : MsgpackDeserializer, n : Int) -> BytesView {
   let view = self.input[self.pos:self.pos + n]
   self.pos = self.pos + n
   view
@@ -139,11 +136,7 @@ fn[T] MsgpackDeserializer::mismatch(
   expected : String,
   marker : Int,
 ) -> T raise @data.DeError {
-  raise @data.InvalidType(
-    path=self.path,
-    expected~,
-    found=kind_name(marker),
-  )
+  raise @data.InvalidType(path=self.path, expected~, found=kind_name(marker))
 }
 
 // ---- integers ----
@@ -575,7 +568,6 @@ pub impl @data.Deserializer for MsgpackDeserializer with fn deserialize_struct_b
   fields,
 ) {
   let _ = self.open(0x80, 0xde, 0xdf, "map", fields)
-
 }
 
 ///|
@@ -609,7 +601,6 @@ pub impl @data.Deserializer for MsgpackDeserializer with fn deserialize_field_va
 /// marker says how much follows it.
 pub impl @data.Deserializer for MsgpackDeserializer with fn skip_value(self) {
   let _ = self.parse_any()
-
 }
 
 ///|
@@ -630,7 +621,6 @@ pub impl @data.Deserializer for MsgpackDeserializer with fn deserialize_enum_beg
       )
     }
     let _ = self.scopes.pop()
-
   }
   let name = self.text()
   let mut index = -1
@@ -690,7 +680,11 @@ fn MsgpackDeserializer::parse_any(
   let m = self.peek()
   if m < 0x80 || m >= 0xe0 || (m >= 0xcc && m <= 0xd3) {
     let v = self.as_int64()
-    return if v >= 0 { @data.UInt(v.reinterpret_as_uint64()) } else { @data.Int(v) }
+    return if v >= 0 {
+      @data.UInt(v.reinterpret_as_uint64())
+    } else {
+      @data.Int(v)
+    }
   }
   if m >= 0xa0 && m < 0xc0 {
     return @data.Str(self.str_bytes())
