@@ -77,10 +77,8 @@ pub impl @data.Deserialize for Config with fn deserialize(d) {
 // ---- rendering ----
 
 ///|
-/// The reason this format cannot stream: `name` is declared before `server`
-/// but so is every scalar, because a `[server]` header would capture anything
-/// written after it.
-test "scalars precede sub-tables regardless of declaration order" {
+/// A nested struct becomes a `[header]` block rather than an inline table.
+test "a nested struct becomes a sub-table" {
   let c = Config::{
     name: "prod",
     server: { host: "localhost", port: 8080, tags: ["a", "b"], timeout: None },
@@ -94,6 +92,31 @@ test "scalars precede sub-tables regardless of declaration order" {
       #|host = "localhost"
       #|port = 8080
       #|tags = ["a", "b"]
+      #|
+    ),
+  )
+}
+
+///|
+/// The reason this format cannot stream, and the case the previous test does
+/// not cover: `b` is declared after `sub`, but a `[sub]` header captures
+/// everything written after it, so `b` has to be hoisted above it. A streaming
+/// serializer sees `serialize_field` in declaration order with no lookahead,
+/// and would emit `b = 3` into `[sub]` — silently, in the wrong table.
+test "a scalar declared after a sub-table is hoisted above it" {
+  let doc : Map[String, @data.Value] = {
+    "a": Int(1L),
+    "sub": Map([(Str(b"x"), Int(2L))]),
+    "b": Int(3L),
+  }
+  inspect(
+    @toml.to_string(doc),
+    content=(
+      #|a = 1
+      #|b = 3
+      #|
+      #|[sub]
+      #|x = 2
       #|
     ),
   )
@@ -295,3 +318,4 @@ test "a duplicate key is an error rather than a silent overwrite" {
     _ => fail("expected a duplicate key to be refused")
   }
 }
+
