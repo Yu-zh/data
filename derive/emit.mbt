@@ -33,6 +33,23 @@ fn Target::impl_head(self : Target, trait_ : String) -> String {
 }
 
 ///|
+/// Whether the generated `serialize` body reads the value at all.
+///
+/// A type with nothing left to write — no fields, or none that survive
+/// `#data.skip` — hands its parameter to no one, and an unused binding named
+/// `self` would warn. Generated code lands in projects that have no way to
+/// annotate away a warning they did not write, so the binder is named for what
+/// the body does with it.
+fn Target::reads_self(self : Target) -> Bool {
+  match self.shape {
+    UnitStruct => false
+    NewtypeStruct | Variant(_) => true
+    Record(fields) => !fields.filter(f => !f.skip).is_empty()
+    TupleStruct(arity) => arity > 0
+  }
+}
+
+///|
 fn quote(text : String) -> String {
   let out = StringBuilder::new()
   out.write_char('"')
@@ -112,11 +129,20 @@ fn field_value(field : Field) -> String {
 
 ///|
 fn write_serialize(out : StringBuilder, target : Target) -> Unit {
+  let self_ = if target.reads_self() { "self" } else { "_self" }
   out.write_string("\n///|\n")
   out.write_string(
-    "\{target.impl_head("Serialize")} with fn serialize(self, serializer) {\n",
+    "\{target.impl_head("Serialize")} with fn serialize(\{self_}, serializer) {\n",
   )
   match target.shape {
+    UnitStruct =>
+      out.write_string(
+        "  serializer.serialize_unit_struct(\{quote(target.name)})\n",
+      )
+    NewtypeStruct =>
+      out.write_string(
+        "  serializer.serialize_newtype_struct(\{quote(target.name)}, self.0)\n",
+      )
     Record(fields) => {
       let kept = fields.filter(f => !f.skip)
       out.write_string(
@@ -198,6 +224,18 @@ fn write_deserialize(out : StringBuilder, target : Target) -> Unit {
     "\{target.impl_head("Deserialize")} with fn deserialize(deserializer) {\n",
   )
   match target.shape {
+    UnitStruct => {
+      out.write_string(
+        "  deserializer.deserialize_unit_struct(\{quote(target.name)})\n",
+      )
+      // Spelled with the type name rather than as a bare `{ }`, which has no
+      // fields to infer the type from.
+      out.write_string("  \{target.name}::{  }\n")
+    }
+    NewtypeStruct =>
+      out.write_string(
+        "  \{target.name}(deserializer.deserialize_newtype_struct(\{quote(target.name)}))\n",
+      )
     Record(fields) => {
       out.write_string(
         "  deserializer.deserialize_struct_begin(\{quote(target.name)}, \{name_list(fields)})\n",

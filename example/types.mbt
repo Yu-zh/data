@@ -45,3 +45,14 @@ pub(all) struct Pair[A, B] {
 ///|
 #data.derive(Serialize, Deserialize)
 pub(all) struct Rgb(Int, Int, Int) derive(Eq, Debug)
+
+///|
+/// One positional field is a wrapper, not a tuple of one: it is written as the
+/// value it wraps, and the name survives only for formats that record it.
+#data.derive(Serialize, Deserialize)
+pub(all) struct Meters(Double) derive(Eq, Debug)
+
+///|
+/// Nothing to write, so it goes out as unit.
+#data.derive(Serialize, Deserialize)
+pub(all) struct Marker {} derive(Eq, Debug)

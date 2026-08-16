@@ -18,6 +18,15 @@ pub(all) struct Config {
 pub impl @data.Deserialize for Config
 pub impl @data.Serialize for Config
 
+pub(all) struct Marker {
+} derive(Eq, @debug.Debug)
+pub impl @data.Deserialize for Marker
+pub impl @data.Serialize for Marker
+
+pub(all) struct Meters(Double) derive(Eq, @debug.Debug)
+pub impl @data.Deserialize for Meters
+pub impl @data.Serialize for Meters
+
 pub(all) struct Pair[A, B] {
   first : A
   second : B

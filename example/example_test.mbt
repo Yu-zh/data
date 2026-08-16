@@ -118,6 +118,26 @@ test "a tuple struct becomes a sequence" {
 }
 
 ///|
+/// A one-field tuple struct is a newtype struct, so the wrapper leaves no
+/// trace: `1.5`, not `[1.5]`.
+test "a newtype struct is written as the value it wraps" {
+  let m = @example.Meters(1.5)
+  inspect(@json.to_string(m), content="1.5")
+  inspect(@data.to_value(m), content="1.5")
+  assert_eq((@json.from_string(@json.to_string(m)) : @example.Meters), m)
+  assert_eq((@data.from_value(@data.to_value(m)) : @example.Meters), m)
+}
+
+///|
+test "a fieldless struct is written as unit" {
+  let m = @example.Marker::{  }
+  inspect(@json.to_string(m), content="null")
+  inspect(@data.to_value(m), content="null")
+  assert_eq((@json.from_string(@json.to_string(m)) : @example.Marker), m)
+  assert_eq((@data.from_value(@data.to_value(m)) : @example.Marker), m)
+}
+
+///|
 test "errors from generated impls carry paths like hand-written ones" {
   try
     (@json.from_string("[{\"x\":1,\"y\":\"oops\"}]") : Array[@example.Point])

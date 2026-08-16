@@ -203,3 +203,24 @@ pub impl @data.Deserialize for Rgb with fn deserialize(deserializer) {
   deserializer.deserialize_tuple_end()
   Rgb(v0, v1, v2)
 }
+
+///|
+pub impl @data.Serialize for Meters with fn serialize(self, serializer) {
+  serializer.serialize_newtype_struct("Meters", self.0)
+}
+
+///|
+pub impl @data.Deserialize for Meters with fn deserialize(deserializer) {
+  Meters(deserializer.deserialize_newtype_struct("Meters"))
+}
+
+///|
+pub impl @data.Serialize for Marker with fn serialize(_self, serializer) {
+  serializer.serialize_unit_struct("Marker")
+}
+
+///|
+pub impl @data.Deserialize for Marker with fn deserialize(deserializer) {
+  deserializer.deserialize_unit_struct("Marker")
+  Marker::{  }
+}

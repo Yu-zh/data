@@ -238,8 +238,18 @@ fn scan(
     guard marked else { continue }
     let site = "\{where_}: type `\{decl.tycon}`"
     let shape = match decl.components {
-      Record(fields~) => Record(scan_fields(fields, site))
-      TupleStruct(types) => TupleStruct(types.length())
+      Record(fields~) =>
+        if fields.is_empty() {
+          UnitStruct
+        } else {
+          Record(scan_fields(fields, site))
+        }
+      TupleStruct(types) =>
+        if types.length() == 1 {
+          NewtypeStruct
+        } else {
+          TupleStruct(types.length())
+        }
       Variant(constrs) => {
         let cases = []
         for constr in constrs {

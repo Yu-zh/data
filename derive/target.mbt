@@ -20,7 +20,22 @@ struct Target {
 }
 
 ///|
+/// Which of the data model's struct forms a type maps onto.
+///
+/// The two degenerate forms are separated out for the same reason serde
+/// separates them: a struct wrapping exactly one value is a wrapper, not a
+/// one-element tuple, and a struct with nothing in it carries no more
+/// information than unit. Both have their own `Serializer` methods, whose
+/// defaults widen to the general form, so a format that draws no distinction
+/// still writes what `TupleStruct` and `Record` would have written.
 enum Shape {
+  /// `struct Foo {}` — no fields at all. Not the same as a record whose
+  /// fields are all `#data.skip`ed: that one still has a shape, and stays a
+  /// `Record` with nothing left to write.
+  UnitStruct
+  /// `struct Foo(Int)` — exactly one positional field, written as the value
+  /// it wraps rather than as a sequence of one.
+  NewtypeStruct
   /// `struct Foo { a : Int }`
   Record(Array[Field])
   /// `struct Foo(Int, Int)`

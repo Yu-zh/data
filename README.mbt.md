@@ -237,6 +237,14 @@ moonx Yu-zh/data/derive [path ...]
 Generic types get one trait bound per parameter, so `Pair[A, B]` derives as
 `impl[A : Serialize, B : Serialize] Serialize for Pair[A, B]`.
 
+A struct's declared shape picks its form in the data model, and the two
+degenerate shapes are not spelled as the general one: `struct Rgb(Int, Int,
+Int)` is a tuple struct, but `struct Meters(Double)` is a *newtype* struct,
+written as the value it wraps rather than as a sequence of one, and
+`struct Marker {}` is a unit struct, written as unit. Formats that draw no
+distinction still receive what the general form would have written, since the
+`Serializer` defaults widen back to it.
+
 There is no build-system hook — the current `moon.pkg` format has no pre-build
 step — so generated files are committed alongside their sources and the
 generator is re-run by hand. It is idempotent, and CI can check nothing is
