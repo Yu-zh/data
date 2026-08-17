@@ -117,13 +117,13 @@ fn write_field_loop(
 }
 
 ///|
-fn field_value(field : Field) -> String {
+fn field_value(field : Field, indent : String) -> String {
   if field.skip {
     "Default::default()"
   } else if field.optional {
     "f_\{field.ident}"
   } else {
-    "@data.required(f_\{field.ident}, \{quote(field.name)}, deserializer.path())"
+    "match f_\{field.ident} {\n\{indent}  Some(value) => value\n\{indent}  None => @data.required(None, \{quote(field.name)}, deserializer.path())\n\{indent}}"
   }
 }
 
@@ -243,7 +243,7 @@ fn write_deserialize(out : StringBuilder, target : Target) -> Unit {
       write_field_loop(out, fields, "  ")
       out.write_string("  {\n")
       for field in fields {
-        out.write_string("    \{field.ident}: \{field_value(field)},\n")
+        out.write_string("    \{field.ident}: \{field_value(field, "    ")},\n")
       }
       out.write_string("  }\n")
     }
@@ -299,8 +299,13 @@ fn write_deserialize(out : StringBuilder, target : Target) -> Unit {
               "      deserializer.deserialize_struct_begin(\{quote(case_.name)}, \{name_list(fields)})\n",
             )
             write_field_loop(out, fields, "      ")
-            let binds = fields.map(f => "\{f.ident}=\{field_value(f)}")
-            out.write_string("      \{case_.ident}(\{binds.join(", ")})\n")
+            out.write_string("      \{case_.ident}(\n")
+            for field in fields {
+              out.write_string(
+                "        \{field.ident}=\{field_value(field, "        ")},\n",
+              )
+            }
+            out.write_string("      )\n")
             out.write_string("    }\n")
           }
         }

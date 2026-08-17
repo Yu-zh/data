@@ -1,9 +1,73 @@
 ///|
+/// Mutable path state used by the streaming reader.
+///
+/// At each depth, a non-negative value in `indices` is a sequence index;
+/// `-1` means the corresponding entry in `keys` is a struct field or map key.
+/// Slots are reused and `depth` selects the active prefix, so advancing through
+/// successful input does not allocate or resize once the maximum nesting depth
+/// seen so far has been reached.
+priv struct PathTracker {
+  indices : Array[Int]
+  keys : Array[String]
+  mut depth : Int
+}
+
+///|
+fn PathTracker::new() -> PathTracker {
+  { indices: [], keys: [], depth: 0 }
+}
+
+///|
+fn PathTracker::materialize(self : PathTracker) -> @data.Path {
+  for i in 0..<self.depth; current = @data.Root {
+    let index = self.indices[i]
+    continue if index < 0 {
+        current.key(self.keys[i])
+      } else {
+        current.index(index)
+      }
+  } nobreak {
+    current
+  }
+}
+
+///|
+fn PathTracker::set_key(
+  self : PathTracker,
+  base_depth : Int,
+  name : String,
+) -> Unit {
+  if base_depth < self.indices.length() {
+    self.indices[base_depth] = -1
+    self.keys[base_depth] = name
+  } else {
+    self.indices.push(-1)
+    self.keys.push(name)
+  }
+  self.depth = base_depth + 1
+}
+
+///|
+fn PathTracker::set_index(
+  self : PathTracker,
+  base_depth : Int,
+  index : Int,
+) -> Unit {
+  if base_depth < self.indices.length() {
+    self.indices[base_depth] = index
+  } else {
+    self.indices.push(index)
+    self.keys.push("")
+  }
+  self.depth = base_depth + 1
+}
+
+///|
 /// One open `[` or `{`, remembering the path to restore on the way out and how
 /// many items have been read so far (which is what decides whether the next
 /// item needs a leading comma).
 priv struct Scope {
-  base : @data.Path
+  base_depth : Int
   mut count : Int
   /// The field names the caller declared for this struct, empty for arrays
   /// and maps. Matching a key against these lets `deserialize_field_name`
@@ -17,7 +81,7 @@ priv struct Scope {
 /// `"Variant"` string, which does not.
 priv struct EnumScope {
   wrapped : Bool
-  base : @data.Path
+  base_depth : Int
 }
 
 ///|
@@ -30,7 +94,7 @@ priv struct EnumScope {
 struct JsonDeserializer {
   input : Bytes
   mut pos : Int
-  mut path : @data.Path
+  path : PathTracker
   scopes : Array[Scope]
   enums : Array[EnumScope]
   /// Set on the throwaway deserializer used to read an object key: the
@@ -43,7 +107,70 @@ struct JsonDeserializer {
 
 ///|
 pub fn JsonDeserializer::new(input : Bytes) -> JsonDeserializer {
-  { input, pos: 0, path: @data.Root, scopes: [], enums: [], bare: None }
+  { input, pos: 0, path: PathTracker::new(), scopes: [], enums: [], bare: None }
+}
+
+///|
+/// Builds the public, persistent representation only for callers that need
+/// to observe the path. The success path never calls this method.
+#inline(never)
+fn JsonDeserializer::current_path(self : JsonDeserializer) -> @data.Path {
+  self.path.materialize()
+}
+
+///|
+/// Cold error helpers keep path materialisation and error-object construction
+/// out of the parser's successful machine-code paths.
+#inline(never)
+fn JsonDeserializer::eof_error(self : JsonDeserializer) -> @data.DeError {
+  @data.Eof(path=self.current_path())
+}
+
+///|
+#inline(never)
+fn JsonDeserializer::custom_error(
+  self : JsonDeserializer,
+  message : String,
+) -> @data.DeError {
+  @data.DeCustom(path=self.current_path(), message~)
+}
+
+///|
+#inline(never)
+fn JsonDeserializer::invalid_value_error(
+  self : JsonDeserializer,
+  expected : String,
+  found : String,
+) -> @data.DeError {
+  @data.InvalidValue(path=self.current_path(), expected~, found~)
+}
+
+///|
+#inline(never)
+fn JsonDeserializer::unknown_variant_error(
+  self : JsonDeserializer,
+  variant : String,
+  expected : Array[String],
+) -> @data.DeError {
+  @data.UnknownVariant(path=self.current_path(), variant~, expected~)
+}
+
+///|
+fn JsonDeserializer::set_key(
+  self : JsonDeserializer,
+  base_depth : Int,
+  name : String,
+) -> Unit {
+  self.path.set_key(base_depth, name)
+}
+
+///|
+fn JsonDeserializer::set_index(
+  self : JsonDeserializer,
+  base_depth : Int,
+  index : Int,
+) -> Unit {
+  self.path.set_index(base_depth, index)
 }
 
 ///|
@@ -53,7 +180,7 @@ pub fn JsonDeserializer::finish(
 ) -> Unit raise @data.DeError {
   self.skip_ws()
   if self.pos < self.input.length() {
-    raise @data.DeCustom(path=self.path, message="trailing input after value")
+    raise self.custom_error("trailing input after value")
   }
 }
 
@@ -65,6 +192,9 @@ fn JsonDeserializer::key_reader(
   {
     input: b"",
     pos: 0,
+    // The reader is consumed synchronously and successful bare-key decoding
+    // cannot advance a container, so sharing the tracker is an immutable
+    // snapshot for the duration of this call.
     path: self.path,
     scopes: [],
     enums: [],
@@ -100,12 +230,22 @@ fn JsonDeserializer::skip_ws(self : JsonDeserializer) -> Unit {
 }
 
 ///|
-fn JsonDeserializer::peek(self : JsonDeserializer) -> Int raise @data.DeError {
+fn JsonDeserializer::peek_or_end(self : JsonDeserializer) -> Int {
   self.skip_ws()
   if self.at_end() {
-    raise @data.Eof(path=self.path)
+    -1
+  } else {
+    self.code(self.pos)
   }
-  self.code(self.pos)
+}
+
+///|
+fn JsonDeserializer::peek(self : JsonDeserializer) -> Int raise @data.DeError {
+  let token = self.peek_or_end()
+  if token < 0 {
+    raise self.eof_error()
+  }
+  token
 }
 
 ///|
@@ -138,18 +278,24 @@ fn JsonDeserializer::found(self : JsonDeserializer) -> String {
 }
 
 ///|
+fn JsonDeserializer::try_expect(self : JsonDeserializer, ch : Char) -> Bool {
+  if self.peek_or_end() != ch.to_int() {
+    return false
+  }
+  self.pos = self.pos + 1
+  true
+}
+
+///|
 fn JsonDeserializer::expect(
   self : JsonDeserializer,
   ch : Char,
 ) -> Unit raise @data.DeError {
-  let c = self.peek()
-  guard c == ch.to_int() else {
-    raise @data.DeCustom(
-      path=self.path,
-      message="expected `\{ch}`, found `\{describe(c)}`",
-    )
+  if self.try_expect(ch) {
+    return
   }
-  self.pos = self.pos + 1
+  let c = self.peek()
+  raise self.custom_error("expected `\{ch}`, found `\{describe(c)}`")
 }
 
 ///|
@@ -171,22 +317,25 @@ fn JsonDeserializer::eat(self : JsonDeserializer, literal : String) -> Bool {
 /// A token that begins like `true` / `false` / `null` but does not finish that
 /// way is a malformed literal, not a value of some other type. Saying so beats
 /// "expected unit, found unit".
+#inline(never)
 fn[T] JsonDeserializer::bad_literal(
   self : JsonDeserializer,
   expected : String,
 ) -> T raise @data.DeError {
-  raise @data.DeCustom(
-    path=self.path,
-    message="invalid literal, expected `\{expected}`",
-  )
+  raise self.custom_error("invalid literal, expected `\{expected}`")
 }
 
 ///|
+#inline(never)
 fn[T] JsonDeserializer::mismatch(
   self : JsonDeserializer,
   expected : String,
 ) -> T raise @data.DeError {
-  raise @data.InvalidType(path=self.path, expected~, found=self.found())
+  raise @data.InvalidType(
+    path=self.current_path(),
+    expected~,
+    found=self.found(),
+  )
 }
 
 // ---- strings ----
@@ -194,7 +343,7 @@ fn[T] JsonDeserializer::mismatch(
 ///|
 fn JsonDeserializer::hex4(self : JsonDeserializer) -> Int raise @data.DeError {
   if self.pos + 4 > self.input.length() {
-    raise @data.Eof(path=self.path)
+    raise self.eof_error()
   }
   let mut value = 0
   for i in 0..<4 {
@@ -206,9 +355,8 @@ fn JsonDeserializer::hex4(self : JsonDeserializer) -> Int raise @data.DeError {
     } else if c >= 0x41 && c <= 0x46 {
       c - 0x41 + 10
     } else {
-      raise @data.DeCustom(
-        path=self.path,
-        message="invalid `\\u` escape: `\{describe(c)}` is not a hex digit",
+      raise self.custom_error(
+        "invalid `\\u` escape: `\{describe(c)}` is not a hex digit",
       )
     }
     value = value * 16 + digit
@@ -237,7 +385,7 @@ fn JsonDeserializer::decode_escape(
   out : @buffer.Buffer,
 ) -> Unit raise @data.DeError {
   if self.at_end() {
-    raise @data.Eof(path=self.path)
+    raise self.eof_error()
   }
   let e = self.code(self.pos)
   self.pos = self.pos + 1
@@ -254,35 +402,26 @@ fn JsonDeserializer::decode_escape(
       let hi = self.hex4()
       if hi >= 0xD800 && hi <= 0xDBFF {
         guard self.eat_u_escape() else {
-          raise @data.DeCustom(
-            path=self.path,
-            message="high surrogate escape is not followed by a low surrogate",
+          raise self.custom_error(
+            "high surrogate escape is not followed by a low surrogate",
           )
         }
         let lo = self.hex4()
         guard lo >= 0xDC00 && lo <= 0xDFFF else {
-          raise @data.DeCustom(
-            path=self.path,
-            message="high surrogate escape is not followed by a low surrogate",
+          raise self.custom_error(
+            "high surrogate escape is not followed by a low surrogate",
           )
         }
         out.write_char_utf8(
           Int::unsafe_to_char(0x10000 + (hi - 0xD800) * 0x400 + (lo - 0xDC00)),
         )
       } else if hi >= 0xDC00 && hi <= 0xDFFF {
-        raise @data.DeCustom(
-          path=self.path,
-          message="unpaired low surrogate escape",
-        )
+        raise self.custom_error("unpaired low surrogate escape")
       } else {
         out.write_char_utf8(Int::unsafe_to_char(hi))
       }
     }
-    _ =>
-      raise @data.DeCustom(
-        path=self.path,
-        message="unknown escape `\\\{describe(e)}`",
-      )
+    _ => raise self.custom_error("unknown escape `\\\{describe(e)}`")
   }
 }
 
@@ -323,7 +462,7 @@ fn JsonDeserializer::string_extent(
     }
     i = i + 1
   }
-  raise @data.Eof(path=self.path)
+  raise self.eof_error()
 }
 
 ///|
@@ -336,11 +475,7 @@ fn JsonDeserializer::classify_stop(
   match self.code(at) {
     0x22 => (start, at, true)
     0x5C => (start, at, false)
-    _ =>
-      raise @data.DeCustom(
-        path=self.path,
-        message="unescaped control character in string",
-      )
+    _ => raise self.custom_error("unescaped control character in string")
   }
 }
 
@@ -365,7 +500,7 @@ fn JsonDeserializer::parse_string_bytes(
   let mut chunk = end
   while true {
     if self.at_end() {
-      raise @data.Eof(path=self.path)
+      raise self.eof_error()
     }
     let c = self.code(self.pos)
     if c == 0x22 {
@@ -378,10 +513,7 @@ fn JsonDeserializer::parse_string_bytes(
       self.decode_escape(out)
       chunk = self.pos
     } else if c < 0x20 {
-      raise @data.DeCustom(
-        path=self.path,
-        message="unescaped control character in string",
-      )
+      raise self.custom_error("unescaped control character in string")
     } else {
       self.pos = self.pos + 1
     }
@@ -396,8 +528,7 @@ fn JsonDeserializer::parse_string(
 ) -> String raise @data.DeError {
   let bytes = self.parse_string_bytes()
   @utf8.decode(bytes) catch {
-    _ =>
-      raise @data.DeCustom(path=self.path, message="input is not valid UTF-8")
+    _ => raise self.custom_error("input is not valid UTF-8")
   }
 }
 
@@ -439,7 +570,6 @@ fn JsonDeserializer::spells(
 fn JsonDeserializer::variant_index(
   self : JsonDeserializer,
   variants : Array[String],
-  base : @data.Path,
 ) -> Int raise @data.DeError {
   let (start, end, clean) = self.string_extent()
   if clean {
@@ -459,7 +589,7 @@ fn JsonDeserializer::variant_index(
       return i
     }
   }
-  raise @data.UnknownVariant(path=base, variant=found, expected=variants)
+  raise self.unknown_variant_error(found, variants)
 }
 
 ///|
@@ -664,11 +794,7 @@ fn JsonDeserializer::int64_in_span(
     i = i + 1
   }
   guard i < end else {
-    raise @data.InvalidValue(
-      path=self.path,
-      expected="an integer",
-      found=self.token_text(start, end),
-    )
+    raise self.invalid_value_error("an integer", self.token_text(start, end))
   }
   let limit : UInt64 = if negative {
     9223372036854775808UL
@@ -679,18 +805,13 @@ fn JsonDeserializer::int64_in_span(
   while i < end {
     let digit = self.code(i) - 0x30
     guard digit >= 0 && digit <= 9 else {
-      raise @data.InvalidValue(
-        path=self.path,
-        expected="an integer",
-        found=self.token_text(start, end),
-      )
+      raise self.invalid_value_error("an integer", self.token_text(start, end))
     }
     let d = digit.to_uint64()
     guard magnitude <= (limit - d) / 10UL else {
-      raise @data.InvalidValue(
-        path=self.path,
-        expected="an integer that fits in 64 bits",
-        found=self.token_text(start, end),
+      raise self.invalid_value_error(
+        "an integer that fits in 64 bits",
+        self.token_text(start, end),
       )
     }
     magnitude = magnitude * 10UL + d
@@ -712,10 +833,9 @@ fn JsonDeserializer::uint64_in_span(
 ) -> UInt64 raise @data.DeError {
   let mut i = start
   guard i < end && self.code(i) != 0x2D else {
-    raise @data.InvalidValue(
-      path=self.path,
-      expected="an unsigned integer",
-      found=self.token_text(start, end),
+    raise self.invalid_value_error(
+      "an unsigned integer",
+      self.token_text(start, end),
     )
   }
   if self.code(i) == 0x2B {
@@ -725,18 +845,16 @@ fn JsonDeserializer::uint64_in_span(
   while i < end {
     let digit = self.code(i) - 0x30
     guard digit >= 0 && digit <= 9 else {
-      raise @data.InvalidValue(
-        path=self.path,
-        expected="an unsigned integer",
-        found=self.token_text(start, end),
+      raise self.invalid_value_error(
+        "an unsigned integer",
+        self.token_text(start, end),
       )
     }
     let d = digit.to_uint64()
     guard magnitude <= (18446744073709551615UL - d) / 10UL else {
-      raise @data.InvalidValue(
-        path=self.path,
-        expected="an unsigned integer that fits in 64 bits",
-        found=self.token_text(start, end),
+      raise self.invalid_value_error(
+        "an unsigned integer that fits in 64 bits",
+        self.token_text(start, end),
       )
     }
     magnitude = magnitude * 10UL + d
@@ -752,21 +870,12 @@ fn JsonDeserializer::read_int64(
   if self.bare is Some(raw) {
     let text = @ascii.decode_lossy(raw)
     return @string.parse_int64(text) catch {
-      _ =>
-        raise @data.InvalidValue(
-          path=self.path,
-          expected="an integer",
-          found=text,
-        )
+      _ => raise self.invalid_value_error("an integer", text)
     }
   }
   let (scan, start, end) = self.take_number()
   guard scan.integral else {
-    raise @data.InvalidValue(
-      path=self.path,
-      expected="an integer",
-      found=self.token_text(start, end),
-    )
+    raise self.invalid_value_error("an integer", self.token_text(start, end))
   }
   self.int64_in_span(start, end)
 }
@@ -778,23 +887,14 @@ fn JsonDeserializer::read_double(
   if self.bare is Some(raw) {
     let text = @ascii.decode_lossy(raw)
     return @string.parse_double(text) catch {
-      _ =>
-        raise @data.InvalidValue(
-          path=self.path,
-          expected="a number",
-          found=text,
-        )
+      _ => raise self.invalid_value_error("a number", text)
     }
   }
   let (scan, start, end) = self.take_number()
   match scan_to_double(scan, () => self.token_text(start, end)) {
     Some(value) => value
     None =>
-      raise @data.InvalidValue(
-        path=self.path,
-        expected="a number",
-        found=self.token_text(start, end),
-      )
+      raise self.invalid_value_error("a number", self.token_text(start, end))
   }
 }
 
@@ -807,11 +907,7 @@ fn JsonDeserializer::int_in_range(
 ) -> Int64 raise @data.DeError {
   let value = self.read_int64()
   if value < lo || value > hi {
-    raise @data.InvalidValue(
-      path=self.path,
-      expected=what,
-      found=value.to_string(),
-    )
+    raise self.invalid_value_error(what, value.to_string())
   }
   value
 }
@@ -826,7 +922,7 @@ fn JsonDeserializer::push_scope(
   self : JsonDeserializer,
   expected : Array[String],
 ) -> Unit {
-  self.scopes.push({ base: self.path, count: 0, expected })
+  self.scopes.push({ base_depth: self.path.depth, count: 0, expected })
 }
 
 ///|
@@ -834,10 +930,7 @@ fn JsonDeserializer::top_scope(
   self : JsonDeserializer,
 ) -> Scope raise @data.DeError {
   guard self.scopes.length() > 0 else {
-    raise @data.DeCustom(
-      path=self.path,
-      message="JSON: container read without a begin",
-    )
+    raise self.custom_error("JSON: container read without a begin")
   }
   self.scopes[self.scopes.length() - 1]
 }
@@ -847,19 +940,17 @@ fn JsonDeserializer::pop_scope(
   self : JsonDeserializer,
 ) -> Unit raise @data.DeError {
   guard self.scopes.pop() is Some(scope) else {
-    raise @data.DeCustom(
-      path=self.path,
-      message="JSON: container ended without a begin",
-    )
+    raise self.custom_error("JSON: container ended without a begin")
   }
-  self.path = scope.base
+  self.path.depth = scope.base_depth
 }
 
 ///|
 /// Advances to the next item of an open container, or closes it.
 ///
 /// Returns `false` when the closing delimiter was consumed and the scope
-/// popped, `true` when a further item follows and the path has been set to it.
+/// popped, `true` when a further item follows. The caller then appends the
+/// field name or element index to the saved base depth.
 fn JsonDeserializer::next_item(
   self : JsonDeserializer,
   closing : Int,
@@ -885,17 +976,21 @@ fn JsonDeserializer::parse_any(
   if self.bare is Some(raw) {
     return Str(raw)
   }
-  match self.peek() {
+  let token = self.peek_or_end()
+  if token < 0 {
+    raise self.eof_error()
+  }
+  match token {
     0x7B => {
       self.pos = self.pos + 1
       let entries = []
-      while self.peek() != 0x7D {
+      while self.peek_or_end() != 0x7D {
         if entries.length() > 0 {
-          self.expect(',')
+          guard self.try_expect(',') else { self.expect(',') }
         }
         // The key goes into the data model as the bytes it already is.
         let key = self.parse_string_bytes()
-        self.expect(':')
+        guard self.try_expect(':') else { self.expect(':') }
         entries.push((@data.Str(key), self.parse_any()))
       }
       self.pos = self.pos + 1
@@ -904,9 +999,9 @@ fn JsonDeserializer::parse_any(
     0x5B => {
       self.pos = self.pos + 1
       let items = []
-      while self.peek() != 0x5D {
+      while self.peek_or_end() != 0x5D {
         if items.length() > 0 {
-          self.expect(',')
+          guard self.try_expect(',') else { self.expect(',') }
         }
         items.push(self.parse_any())
       }
@@ -938,24 +1033,14 @@ fn JsonDeserializer::parse_any(
               _ =>
                 match scan_to_double(scan, text) {
                   Some(value) => @data.Double(value)
-                  None =>
-                    raise @data.InvalidValue(
-                      path=self.path,
-                      expected="a number",
-                      found=text(),
-                    )
+                  None => raise self.invalid_value_error("a number", text())
                 }
             }
         }
       } else {
         match scan_to_double(scan, text) {
           Some(value) => @data.Double(value)
-          None =>
-            raise @data.InvalidValue(
-              path=self.path,
-              expected="a number",
-              found=text(),
-            )
+          None => raise self.invalid_value_error("a number", text())
         }
       }
     }
@@ -966,7 +1051,7 @@ fn JsonDeserializer::parse_any(
 
 ///|
 pub impl @data.Deserializer for JsonDeserializer with fn path(self) {
-  self.path
+  self.current_path()
 }
 
 ///|
@@ -1032,20 +1117,14 @@ pub impl @data.Deserializer for JsonDeserializer with fn deserialize_uint64(
   if self.bare is Some(raw) {
     let text = @ascii.decode_lossy(raw)
     return @string.parse_uint64(text) catch {
-      _ =>
-        raise @data.InvalidValue(
-          path=self.path,
-          expected="an unsigned integer",
-          found=text,
-        )
+      _ => raise self.invalid_value_error("an unsigned integer", text)
     }
   }
   let (scan, start, end) = self.take_number()
   guard scan.integral else {
-    raise @data.InvalidValue(
-      path=self.path,
-      expected="an unsigned integer",
-      found=self.token_text(start, end),
+    raise self.invalid_value_error(
+      "an unsigned integer",
+      self.token_text(start, end),
     )
   }
   self.uint64_in_span(start, end)
@@ -1067,11 +1146,7 @@ pub impl @data.Deserializer for JsonDeserializer with fn deserialize_double(
 pub impl @data.Deserializer for JsonDeserializer with fn deserialize_char(self) {
   let text = self.deserialize_string()
   if text.char_length() != 1 {
-    raise @data.InvalidValue(
-      path=self.path,
-      expected="a single character",
-      found=text,
-    )
+    raise self.invalid_value_error("a single character", text)
   }
   text.to_array()[0]
 }
@@ -1082,8 +1157,7 @@ pub impl @data.Deserializer for JsonDeserializer with fn deserialize_string(
 ) {
   if self.bare is Some(raw) {
     @utf8.decode(raw) catch {
-      _ =>
-        raise @data.DeCustom(path=self.path, message="input is not valid UTF-8")
+      _ => raise self.custom_error("input is not valid UTF-8")
     }
   } else {
     self.parse_string()
@@ -1133,7 +1207,7 @@ pub impl @data.Deserializer for JsonDeserializer with fn deserialize_seq_next(
 ) {
   guard self.next_item(0x5D) else { return None }
   let scope = self.top_scope()
-  self.path = scope.base.index(scope.count)
+  self.set_index(scope.base_depth, scope.count)
   scope.count = scope.count + 1
   Some(@data.Deserialize::deserialize(self))
 }
@@ -1155,7 +1229,7 @@ pub impl @data.Deserializer for JsonDeserializer with fn deserialize_map_next_ke
   let scope = self.top_scope()
   let key = self.parse_string_bytes()
   self.expect(':')
-  self.path = scope.base.key(@ascii.decode_lossy(key))
+  self.set_key(scope.base_depth, @ascii.decode_lossy(key))
   scope.count = scope.count + 1
   Some(@data.Deserialize::deserialize(self.key_reader(key)))
 }
@@ -1185,7 +1259,7 @@ pub impl @data.Deserializer for JsonDeserializer with fn deserialize_field_name(
   let scope = self.top_scope()
   let name = self.identifier(scope.expected)
   self.expect(':')
-  self.path = scope.base.key(name)
+  self.set_key(scope.base_depth, name)
   scope.count = scope.count + 1
   Some(name)
 }
@@ -1208,17 +1282,17 @@ pub impl @data.Deserializer for JsonDeserializer with fn deserialize_enum_begin(
   _name,
   variants,
 ) {
-  let base = self.path
+  let base_depth = self.path.depth
   let wrapped = self.peek() == 0x7B
   if wrapped {
     self.pos = self.pos + 1
   }
-  let index = self.variant_index(variants, base)
+  let index = self.variant_index(variants)
   if wrapped {
     self.expect(':')
   }
-  self.enums.push({ wrapped, base })
-  self.path = base.key(variants[index])
+  self.enums.push({ wrapped, base_depth })
+  self.set_key(base_depth, variants[index])
   index
 }
 
@@ -1241,15 +1315,12 @@ pub impl @data.Deserializer for JsonDeserializer with fn deserialize_enum_end(
   self,
 ) {
   guard self.enums.pop() is Some(scope) else {
-    raise @data.DeCustom(
-      path=self.path,
-      message="JSON: enum ended without a begin",
-    )
+    raise self.custom_error("JSON: enum ended without a begin")
   }
   if scope.wrapped {
     self.expect('}')
   }
-  self.path = scope.base
+  self.path.depth = scope.base_depth
 }
 
 ///|
@@ -1276,12 +1347,12 @@ pub impl @data.Deserializer for JsonDeserializer with fn deserialize_tuple_next(
 ) {
   let scope = self.top_scope()
   if self.peek() == 0x5D {
-    raise @data.Eof(path=self.path)
+    raise self.eof_error()
   }
   if scope.count > 0 {
     self.expect(',')
   }
-  self.path = scope.base.index(scope.count)
+  self.set_index(scope.base_depth, scope.count)
   scope.count = scope.count + 1
   @data.Deserialize::deserialize(self)
 }

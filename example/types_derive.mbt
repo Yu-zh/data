@@ -25,8 +25,14 @@ pub impl @data.Deserialize for Point with fn deserialize(deserializer) {
     }
   }
   {
-    x: @data.required(f_x, "x", deserializer.path()),
-    y: @data.required(f_y, "y", deserializer.path()),
+    x: match f_x {
+      Some(value) => value
+      None => @data.required(None, "x", deserializer.path())
+    },
+    y: match f_y {
+      Some(value) => value
+      None => @data.required(None, "y", deserializer.path())
+    },
     label: f_label,
   }
 }
@@ -50,11 +56,10 @@ pub impl @data.Deserialize for Config with fn deserialize(deserializer) {
     }
   }
   {
-    max_retries: @data.required(
-      f_max_retries,
-      "max-retries",
-      deserializer.path(),
-    ),
+    max_retries: match f_max_retries {
+      Some(value) => value
+      None => @data.required(None, "max-retries", deserializer.path())
+    },
     cache_generation: Default::default(),
   }
 }
@@ -131,8 +136,14 @@ pub impl @data.Deserialize for Shape with fn deserialize(deserializer) {
         }
       }
       Tagged(
-        name=@data.required(f_name, "name", deserializer.path()),
-        size=@data.required(f_size, "size", deserializer.path()),
+        name=match f_name {
+          Some(value) => value
+          None => @data.required(None, "name", deserializer.path())
+        },
+        size=match f_size {
+          Some(value) => value
+          None => @data.required(None, "size", deserializer.path())
+        },
       )
     }
     4 => {
@@ -180,8 +191,14 @@ pub impl[A : @data.Deserialize, B : @data.Deserialize] @data.Deserialize for Pai
     }
   }
   {
-    first: @data.required(f_first, "first", deserializer.path()),
-    second: @data.required(f_second, "second", deserializer.path()),
+    first: match f_first {
+      Some(value) => value
+      None => @data.required(None, "first", deserializer.path())
+    },
+    second: match f_second {
+      Some(value) => value
+      None => @data.required(None, "second", deserializer.path())
+    },
   }
 }
 

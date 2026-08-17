@@ -478,6 +478,11 @@ test "a missing required field is reported by name" {
   } noraise {
     _ => fail("expected a missing field error")
   }
+  try (@json.from_string("[{\"x\":1}]") : Array[Point]) catch {
+    e => inspect(e, content="$[0]: missing field `y`")
+  } noraise {
+    _ => fail("expected a nested missing field error")
+  }
 }
 
 ///|

@@ -50,7 +50,10 @@ test "a record derives both directions" {
       #|    }
       #|  }
       #|  {
-      #|    x: @data.required(f_x, "x", deserializer.path()),
+      #|    x: match f_x {
+      #|      Some(value) => value
+      #|      None => @data.required(None, "x", deserializer.path())
+      #|    },
       #|    label: f_label,
       #|  }
       #|}
@@ -95,7 +98,10 @@ test "rename and skip change the wire form, not the type" {
       #|    }
       #|  }
       #|  {
-      #|    max_retries: @data.required(f_max_retries, "max-retries", deserializer.path()),
+      #|    max_retries: match f_max_retries {
+      #|      Some(value) => value
+      #|      None => @data.required(None, "max-retries", deserializer.path())
+      #|    },
       #|    cached: Default::default(),
       #|  }
       #|}
@@ -169,7 +175,16 @@ test "all four variant shapes" {
       #|          _ => deserializer.skip_value()
       #|        }
       #|      }
-      #|      Tagged(name=@data.required(f_name, "name", deserializer.path()), size=@data.required(f_size, "size", deserializer.path()))
+      #|      Tagged(
+      #|        name=match f_name {
+      #|          Some(value) => value
+      #|          None => @data.required(None, "name", deserializer.path())
+      #|        },
+      #|        size=match f_size {
+      #|          Some(value) => value
+      #|          None => @data.required(None, "size", deserializer.path())
+      #|        },
+      #|      )
       #|    }
       #|    index =>
       #|      raise @data.UnknownVariant(path=deserializer.path(), variant=index.to_string(), expected=variants)
@@ -219,8 +234,14 @@ test "generic types get a bound per parameter" {
       #|    }
       #|  }
       #|  {
-      #|    first: @data.required(f_first, "first", deserializer.path()),
-      #|    second: @data.required(f_second, "second", deserializer.path()),
+      #|    first: match f_first {
+      #|      Some(value) => value
+      #|      None => @data.required(None, "first", deserializer.path())
+      #|    },
+      #|    second: match f_second {
+      #|      Some(value) => value
+      #|      None => @data.required(None, "second", deserializer.path())
+      #|    },
       #|  }
       #|}
       #|
