@@ -361,7 +361,7 @@ impl @data.Serializer for BinSerializer with fn is_human_readable(_self) {
 /// positions in order. `FieldIdentifier::from_index` turns each position into
 /// the type's private semantic field enum.
 priv struct FieldCursor {
-  names : ReadOnlyArray[String]
+  names : ArrayView[String]
   mut next : Int
 }
 

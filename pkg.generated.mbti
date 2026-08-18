@@ -18,8 +18,8 @@ pub(all) suberror DeError {
   InvalidValue(path~ : Path, expected~ : String, found~ : String)
   InvalidLength(path~ : Path, expected~ : Int, found~ : Int)
   MissingField(path~ : Path, field~ : String)
-  UnknownField(path~ : Path, field~ : String, expected~ : ReadOnlyArray[String])
-  UnknownVariant(path~ : Path, variant~ : String, expected~ : ReadOnlyArray[String])
+  UnknownField(path~ : Path, field~ : String, expected~ : ArrayView[String])
+  UnknownVariant(path~ : Path, variant~ : String, expected~ : ArrayView[String])
   Eof(path~ : Path)
   DeCustom(path~ : Path, message~ : String)
 }
@@ -70,7 +70,7 @@ pub fn ValueDeserializer::deserialize_byte(Self) -> Byte raise DeError
 pub fn ValueDeserializer::deserialize_bytes(Self) -> Bytes raise DeError
 pub fn ValueDeserializer::deserialize_char(Self) -> Char raise DeError
 pub fn ValueDeserializer::deserialize_double(Self) -> Double raise DeError
-pub fn ValueDeserializer::deserialize_enum_begin(Self, String, ReadOnlyArray[String]) -> Int raise DeError
+pub fn ValueDeserializer::deserialize_enum_begin(Self, String, ArrayView[String]) -> Int raise DeError
 pub fn ValueDeserializer::deserialize_enum_end(Self) -> Unit raise DeError
 pub fn[F : FieldIdentifier] ValueDeserializer::deserialize_field(Self) -> F? raise DeError
 pub fn ValueDeserializer::deserialize_field_name(Self) -> String? raise DeError
@@ -89,7 +89,7 @@ pub fn ValueDeserializer::deserialize_seq_begin(Self) -> Int? raise DeError
 pub fn[T : Deserialize] ValueDeserializer::deserialize_seq_next(Self) -> T? raise DeError
 pub fn ValueDeserializer::deserialize_str_bytes(Self) -> BytesView raise DeError
 pub fn ValueDeserializer::deserialize_string(Self) -> String raise DeError
-pub fn ValueDeserializer::deserialize_struct_begin(Self, String, ReadOnlyArray[String]) -> Unit raise DeError
+pub fn ValueDeserializer::deserialize_struct_begin(Self, String, ArrayView[String]) -> Unit raise DeError
 pub fn ValueDeserializer::deserialize_tuple_begin(Self, Int) -> Unit raise DeError
 pub fn ValueDeserializer::deserialize_tuple_end(Self) -> Unit raise DeError
 pub fn[T : Deserialize] ValueDeserializer::deserialize_tuple_next(Self) -> T raise DeError
@@ -218,12 +218,12 @@ pub(open) trait Deserializer {
   fn deserialize_map_begin(Self) -> Int? raise DeError
   fn[K : Deserialize] deserialize_map_next_key(Self) -> K? raise DeError
   fn[V : Deserialize] deserialize_map_value(Self) -> V raise DeError
-  fn deserialize_struct_begin(Self, String, ReadOnlyArray[String]) -> Unit raise DeError
+  fn deserialize_struct_begin(Self, String, ArrayView[String]) -> Unit raise DeError
   fn[F : FieldIdentifier] deserialize_field(Self) -> F? raise DeError = _
   fn deserialize_field_name(Self) -> String? raise DeError
   fn[T : Deserialize] deserialize_field_value(Self) -> T raise DeError
   fn skip_value(Self) -> Unit raise DeError
-  fn deserialize_enum_begin(Self, String, ReadOnlyArray[String]) -> Int raise DeError
+  fn deserialize_enum_begin(Self, String, ArrayView[String]) -> Int raise DeError
   fn deserialize_unit_variant(Self) -> Unit raise DeError
   fn[T : Deserialize] deserialize_newtype_variant(Self) -> T raise DeError
   fn deserialize_enum_end(Self) -> Unit raise DeError = _

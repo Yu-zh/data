@@ -20,7 +20,7 @@ pub fn MsgpackDeserializer::deserialize_byte(Self) -> Byte raise @data.DeError
 pub fn MsgpackDeserializer::deserialize_bytes(Self) -> Bytes raise @data.DeError
 pub fn MsgpackDeserializer::deserialize_char(Self) -> Char raise @data.DeError
 pub fn MsgpackDeserializer::deserialize_double(Self) -> Double raise @data.DeError
-pub fn MsgpackDeserializer::deserialize_enum_begin(Self, String, ReadOnlyArray[String]) -> Int raise @data.DeError
+pub fn MsgpackDeserializer::deserialize_enum_begin(Self, String, ArrayView[String]) -> Int raise @data.DeError
 pub fn MsgpackDeserializer::deserialize_enum_end(Self) -> Unit raise @data.DeError
 pub fn[F : @data.FieldIdentifier] MsgpackDeserializer::deserialize_field(Self) -> F? raise @data.DeError
 pub fn MsgpackDeserializer::deserialize_field_name(Self) -> String? raise @data.DeError
@@ -39,7 +39,7 @@ pub fn MsgpackDeserializer::deserialize_seq_begin(Self) -> Int? raise @data.DeEr
 pub fn[T : @data.Deserialize] MsgpackDeserializer::deserialize_seq_next(Self) -> T? raise @data.DeError
 pub fn MsgpackDeserializer::deserialize_str_bytes(Self) -> BytesView raise @data.DeError
 pub fn MsgpackDeserializer::deserialize_string(Self) -> String raise @data.DeError
-pub fn MsgpackDeserializer::deserialize_struct_begin(Self, String, ReadOnlyArray[String]) -> Unit raise @data.DeError
+pub fn MsgpackDeserializer::deserialize_struct_begin(Self, String, ArrayView[String]) -> Unit raise @data.DeError
 pub fn MsgpackDeserializer::deserialize_tuple_begin(Self, Int) -> Unit raise @data.DeError
 pub fn MsgpackDeserializer::deserialize_tuple_end(Self) -> Unit raise @data.DeError
 pub fn[T : @data.Deserialize] MsgpackDeserializer::deserialize_tuple_next(Self) -> T raise @data.DeError

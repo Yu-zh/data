@@ -13,7 +13,7 @@ priv struct Scope {
   mut count : Int
   /// The immutable field names the caller declared, empty for arrays and
   /// maps. Known keys reuse these canonical strings for paths.
-  expected : ReadOnlyArray[String]
+  expected : ArrayView[String]
 }
 
 ///|
@@ -313,7 +313,7 @@ fn MsgpackDeserializer::open(
   m16 : Int,
   m32 : Int,
   what : String,
-  expected : ReadOnlyArray[String],
+  expected : ArrayView[String],
 ) -> Int raise @data.DeError {
   let m = self.marker()
   let n = if m >= fix && m < fix + 16 {

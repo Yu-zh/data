@@ -16,7 +16,7 @@ priv struct Scope {
   mut count : Int
   /// The immutable field names the caller declared, empty for arrays and
   /// maps. Known keys reuse these canonical strings for paths.
-  expected : ReadOnlyArray[String]
+  expected : ArrayView[String]
 }
 
 ///|
@@ -400,7 +400,7 @@ fn CborDeserializer::open(
   self : CborDeserializer,
   major : Int,
   what : String,
-  expected : ReadOnlyArray[String],
+  expected : ArrayView[String],
 ) -> Int? raise @data.DeError {
   let h = self.expect_head(major, what)
   let remaining = if h.indefinite {

@@ -427,7 +427,7 @@ fn ValueDeserializer::map_entries(
 /// Where `name` sits in `variants`, which is what `deserialize_enum_begin`
 /// returns. Not finding it is the format's error to raise, not the caller's.
 fn variant_index(
-  variants : ReadOnlyArray[String],
+  variants : ArrayView[String],
   name : String,
   path : Path,
 ) -> Int raise DeError {

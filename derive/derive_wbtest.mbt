@@ -279,6 +279,9 @@ test "all four variant shapes" {
       #|pub extend Shape with @data.Serialize::{serialize}
       #|
       #|///|
+      #|let __data_variants_Shape : ReadOnlyArray[String] = ["Empty", "Circle", "Rect", "Tagged"]
+      #|
+      #|///|
       #|let __data_variant_fields_Shape_3 : ReadOnlyArray[String] = ["name", "size"]
       #|
       #|///|
@@ -331,8 +334,7 @@ test "all four variant shapes" {
       #|
       #|///|
       #|pub impl @data.Deserialize for Shape with fn deserialize(deserializer) {
-      #|  let variants : ReadOnlyArray[String] = ["Empty", "Circle", "Rect", "Tagged"]
-      #|  let value = match deserializer.deserialize_enum_begin("Shape", variants) {
+      #|  let value = match deserializer.deserialize_enum_begin("Shape", __data_variants_Shape) {
       #|    0 => {
       #|      deserializer.deserialize_unit_variant()
       #|      Empty
@@ -368,7 +370,7 @@ test "all four variant shapes" {
       #|      )
       #|    }
       #|    index =>
-      #|      raise @data.UnknownVariant(path=deserializer.path(), variant=index.to_string(), expected=variants)
+      #|      raise @data.UnknownVariant(path=deserializer.path(), variant=index.to_string(), expected=__data_variants_Shape)
       #|  }
       #|  deserializer.deserialize_enum_end()
       #|  value

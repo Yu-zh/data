@@ -85,7 +85,7 @@ pub(open) trait Deserializer {
   fn[V : Deserialize] deserialize_map_value(Self) -> V raise DeError
 
   // ---- structs: `fields` describes the names the type knows about ----
-  fn deserialize_struct_begin(Self, String, ReadOnlyArray[String]) -> Unit raise DeError
+  fn deserialize_struct_begin(Self, String, ArrayView[String]) -> Unit raise DeError
   /// Returns the next field as the semantic identifier chosen by the type.
   ///
   /// `None` terminates the struct. Derived implementations instantiate `F`
@@ -126,7 +126,7 @@ pub(open) trait Deserializer {
   /// lifted to a static: in release builds every call is handed the same
   /// array, where an `Array` would be rebuilt on each, since a mutable one can
   /// never be shared.
-  fn deserialize_enum_begin(Self, String, ReadOnlyArray[String]) -> Int raise DeError
+  fn deserialize_enum_begin(Self, String, ArrayView[String]) -> Int raise DeError
   fn deserialize_unit_variant(Self) -> Unit raise DeError
   fn[T : Deserialize] deserialize_newtype_variant(Self) -> T raise DeError
   /// Leaves an enum, consuming whatever wrapper the tagging scheme used.

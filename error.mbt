@@ -80,13 +80,9 @@ pub(all) suberror DeError {
   /// A struct field was absent and had no default.
   MissingField(path~ : Path, field~ : String)
   /// A struct field was present that the target type does not know about.
-  UnknownField(path~ : Path, field~ : String, expected~ : ReadOnlyArray[String])
+  UnknownField(path~ : Path, field~ : String, expected~ : ArrayView[String])
   /// An enum variant name that the target type does not know about.
-  UnknownVariant(
-    path~ : Path,
-    variant~ : String,
-    expected~ : ReadOnlyArray[String]
-  )
+  UnknownVariant(path~ : Path, variant~ : String, expected~ : ArrayView[String])
   /// Input ended in the middle of a value.
   Eof(path~ : Path)
   /// Anything format-specific.
@@ -109,7 +105,7 @@ pub fn DeError::path(self : DeError) -> Path {
 }
 
 ///|
-fn one_of(names : ReadOnlyArray[String]) -> String {
+fn one_of(names : ArrayView[String]) -> String {
   if names.is_empty() {
     "there are no valid values"
   } else {

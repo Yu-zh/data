@@ -133,6 +133,11 @@ fn variant_field_names_name(target : Target, index : Int) -> String {
 }
 
 ///|
+fn variant_names_name(target : Target) -> String {
+  "__data_variants_\{target.name}"
+}
+
+///|
 fn record_field_identifier_name(target : Target) -> String {
   "DataRecordField\{target.name}"
 }
@@ -251,7 +256,12 @@ fn write_all_field_metadata(out : StringBuilder, target : Target) -> Unit {
         record_field_identifier_name(target),
         fields,
       )
-    Variant(cases) =>
+    Variant(cases) => {
+      let names = cases.map(c => quote(c.name))
+      out.write_string("\n///|\n")
+      out.write_string(
+        "let \{variant_names_name(target)} : ReadOnlyArray[String] = [\{names.join(", ")}]\n",
+      )
       for index, case_ in cases {
         match case_.payload {
           Struct(fields) =>
@@ -264,6 +274,7 @@ fn write_all_field_metadata(out : StringBuilder, target : Target) -> Unit {
           _ => ()
         }
       }
+    }
     _ => ()
   }
 }
@@ -489,12 +500,9 @@ fn write_deserialize(out : StringBuilder, target : Target) -> Unit {
       out.write_string("  \{target.name}(\{binds.join(", ")})\n")
     }
     Variant(cases) => {
-      let names = cases.map(c => quote(c.name))
+      let variants = variant_names_name(target)
       out.write_string(
-        "  let variants : ReadOnlyArray[String] = [\{names.join(", ")}]\n",
-      )
-      out.write_string(
-        "  let value = match deserializer.deserialize_enum_begin(\{quote(target.name)}, variants) {\n",
+        "  let value = match deserializer.deserialize_enum_begin(\{quote(target.name)}, \{variants}) {\n",
       )
       for i, case_ in cases {
         match case_.payload {
@@ -547,7 +555,7 @@ fn write_deserialize(out : StringBuilder, target : Target) -> Unit {
       // for exhaustiveness, and reports a format that broke that contract
       // rather than trusting it.
       out.write_string(
-        "    index =>\n      raise @data.UnknownVariant(path=deserializer.path(), variant=index.to_string(), expected=variants)\n",
+        "    index =>\n      raise @data.UnknownVariant(path=deserializer.path(), variant=index.to_string(), expected=\{variants})\n",
       )
       out.write_string("  }\n")
       out.write_string("  deserializer.deserialize_enum_end()\n")

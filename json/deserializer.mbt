@@ -71,7 +71,7 @@ priv struct Scope {
   mut count : Int
   /// The field names the caller declared for this struct, empty for arrays
   /// and maps. Known raw keys reuse these canonical strings for paths.
-  expected : ReadOnlyArray[String]
+  expected : ArrayView[String]
 }
 
 ///|
@@ -149,7 +149,7 @@ fn JsonDeserializer::invalid_value_error(
 fn JsonDeserializer::unknown_variant_error(
   self : JsonDeserializer,
   variant : String,
-  expected : ReadOnlyArray[String],
+  expected : ArrayView[String],
 ) -> @data.DeError {
   @data.UnknownVariant(path=self.current_path(), variant~, expected~)
 }
@@ -562,7 +562,7 @@ fn JsonDeserializer::spells(
 /// them is still consumed, so the error can name it.
 fn JsonDeserializer::variant_index(
   self : JsonDeserializer,
-  variants : ReadOnlyArray[String],
+  variants : ArrayView[String],
 ) -> Int raise @data.DeError {
   let (start, end, clean) = self.string_extent()
   if clean {
@@ -593,7 +593,7 @@ fn JsonDeserializer::variant_index(
 /// name is materialised.
 fn JsonDeserializer::identifier(
   self : JsonDeserializer,
-  expected : ReadOnlyArray[String],
+  expected : ArrayView[String],
 ) -> String raise @data.DeError {
   let (start, end, clean) = self.string_extent()
   if clean {
@@ -918,7 +918,7 @@ let no_fields : ReadOnlyArray[String] = []
 ///|
 fn JsonDeserializer::push_scope(
   self : JsonDeserializer,
-  expected : ReadOnlyArray[String],
+  expected : ArrayView[String],
 ) -> Unit {
   self.scopes.push({ base_depth: self.path.depth, count: 0, expected })
 }

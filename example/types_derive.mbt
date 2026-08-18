@@ -245,6 +245,11 @@ pub impl @data.Serialize for Shape with fn serialize(self, serializer) {
 pub extend Shape with @data.Serialize::{serialize}
 
 ///|
+let __data_variants_Shape : ReadOnlyArray[String] = [
+  "Empty", "Circle", "Rect", "Tagged", "Ellipse",
+]
+
+///|
 let __data_variant_fields_Shape_3 : ReadOnlyArray[String] = ["name", "size"]
 
 ///|
@@ -300,10 +305,8 @@ impl @data.FieldIdentifier for DataVariantFieldShape3 with fn name(self) {
 
 ///|
 pub impl @data.Deserialize for Shape with fn deserialize(deserializer) {
-  let variants : ReadOnlyArray[String] = [
-    "Empty", "Circle", "Rect", "Tagged", "Ellipse",
-  ]
-  let value = match deserializer.deserialize_enum_begin("Shape", variants) {
+  let value = match
+    deserializer.deserialize_enum_begin("Shape", __data_variants_Shape) {
     0 => {
       deserializer.deserialize_unit_variant()
       Empty
@@ -352,7 +355,7 @@ pub impl @data.Deserialize for Shape with fn deserialize(deserializer) {
       raise @data.UnknownVariant(
         path=deserializer.path(),
         variant=index.to_string(),
-        expected=variants,
+        expected=__data_variants_Shape,
       )
   }
   deserializer.deserialize_enum_end()
