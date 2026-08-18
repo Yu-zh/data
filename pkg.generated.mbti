@@ -8,7 +8,7 @@ import {
 // Values
 pub fn[T : Deserialize] from_value(Value) -> T raise DeError
 
-pub fn[T] required(T?, String, Path) -> T raise DeError
+pub fn[T] required(T?, name~ : String, path~ : Path) -> T raise DeError
 
 pub fn[T : Serialize] to_value(T) -> Value raise SerError
 
@@ -18,8 +18,8 @@ pub(all) suberror DeError {
   InvalidValue(path~ : Path, expected~ : String, found~ : String)
   InvalidLength(path~ : Path, expected~ : Int, found~ : Int)
   MissingField(path~ : Path, field~ : String)
-  UnknownField(path~ : Path, field~ : String, expected~ : Array[String])
-  UnknownVariant(path~ : Path, variant~ : String, expected~ : Array[String])
+  UnknownField(path~ : Path, field~ : String, expected~ : ReadOnlyArray[String])
+  UnknownVariant(path~ : Path, variant~ : String, expected~ : ReadOnlyArray[String])
   Eof(path~ : Path)
   DeCustom(path~ : Path, message~ : String)
 }
@@ -70,7 +70,7 @@ pub fn ValueDeserializer::deserialize_byte(Self) -> Byte raise DeError
 pub fn ValueDeserializer::deserialize_bytes(Self) -> Bytes raise DeError
 pub fn ValueDeserializer::deserialize_char(Self) -> Char raise DeError
 pub fn ValueDeserializer::deserialize_double(Self) -> Double raise DeError
-pub fn ValueDeserializer::deserialize_enum_begin(Self, String, Array[String]) -> Int raise DeError
+pub fn ValueDeserializer::deserialize_enum_begin(Self, String, ReadOnlyArray[String]) -> Int raise DeError
 pub fn ValueDeserializer::deserialize_enum_end(Self) -> Unit raise DeError
 pub fn[F : FieldIdentifier] ValueDeserializer::deserialize_field(Self) -> F? raise DeError
 pub fn ValueDeserializer::deserialize_field_name(Self) -> String? raise DeError
@@ -223,7 +223,7 @@ pub(open) trait Deserializer {
   fn deserialize_field_name(Self) -> String? raise DeError
   fn[T : Deserialize] deserialize_field_value(Self) -> T raise DeError
   fn skip_value(Self) -> Unit raise DeError
-  fn deserialize_enum_begin(Self, String, Array[String]) -> Int raise DeError
+  fn deserialize_enum_begin(Self, String, ReadOnlyArray[String]) -> Int raise DeError
   fn deserialize_unit_variant(Self) -> Unit raise DeError
   fn[T : Deserialize] deserialize_newtype_variant(Self) -> T raise DeError
   fn deserialize_enum_end(Self) -> Unit raise DeError = _

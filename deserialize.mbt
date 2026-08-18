@@ -120,7 +120,13 @@ pub(open) trait Deserializer {
   ///
   /// The payload is then read with the ordinary unit / newtype / tuple /
   /// struct protocols, and the whole thing closed with `deserialize_enum_end`.
-  fn deserialize_enum_begin(Self, String, Array[String]) -> Int raise DeError
+  ///
+  /// `variants` is a `ReadOnlyArray` for the same reason the struct field list
+  /// is. Generated code passes a literal, and only an immutable one can be
+  /// lifted to a static: in release builds every call is handed the same
+  /// array, where an `Array` would be rebuilt on each, since a mutable one can
+  /// never be shared.
+  fn deserialize_enum_begin(Self, String, ReadOnlyArray[String]) -> Int raise DeError
   fn deserialize_unit_variant(Self) -> Unit raise DeError
   fn[T : Deserialize] deserialize_newtype_variant(Self) -> T raise DeError
   /// Leaves an enum, consuming whatever wrapper the tagging scheme used.

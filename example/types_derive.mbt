@@ -93,11 +93,11 @@ pub impl @data.Deserialize for Point with fn deserialize(deserializer) {
   {
     x: match f_x {
       Some(value) => value
-      None => @data.required(None, "x", deserializer.path())
+      None => @data.required(None, name="x", path=deserializer.path())
     },
     y: match f_y {
       Some(value) => value
-      None => @data.required(None, "y", deserializer.path())
+      None => @data.required(None, name="y", path=deserializer.path())
     },
     label: f_label,
   }
@@ -184,7 +184,7 @@ pub impl @data.Deserialize for Config with fn deserialize(deserializer) {
   {
     max_retries: match f_max_retries {
       Some(value) => value
-      None => @data.required(None, "max-retries", deserializer.path())
+      None => @data.required(None, name="max-retries", path=deserializer.path())
     },
     cache_generation: Default::default(),
   }
@@ -300,7 +300,9 @@ impl @data.FieldIdentifier for DataVariantFieldShape3 with fn name(self) {
 
 ///|
 pub impl @data.Deserialize for Shape with fn deserialize(deserializer) {
-  let variants = ["Empty", "Circle", "Rect", "Tagged", "Ellipse"]
+  let variants : ReadOnlyArray[String] = [
+    "Empty", "Circle", "Rect", "Tagged", "Ellipse",
+  ]
   let value = match deserializer.deserialize_enum_begin("Shape", variants) {
     0 => {
       deserializer.deserialize_unit_variant()
@@ -331,11 +333,11 @@ pub impl @data.Deserialize for Shape with fn deserialize(deserializer) {
       Tagged(
         name=match f_name {
           Some(value) => value
-          None => @data.required(None, "name", deserializer.path())
+          None => @data.required(None, name="name", path=deserializer.path())
         },
         size=match f_size {
           Some(value) => value
-          None => @data.required(None, "size", deserializer.path())
+          None => @data.required(None, name="size", path=deserializer.path())
         },
       )
     }
@@ -450,11 +452,11 @@ pub impl[A : @data.Deserialize, B : @data.Deserialize] @data.Deserialize for Pai
   {
     first: match f_first {
       Some(value) => value
-      None => @data.required(None, "first", deserializer.path())
+      None => @data.required(None, name="first", path=deserializer.path())
     },
     second: match f_second {
       Some(value) => value
-      None => @data.required(None, "second", deserializer.path())
+      None => @data.required(None, name="second", path=deserializer.path())
     },
   }
 }

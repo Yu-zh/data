@@ -127,8 +127,8 @@ pub impl @data.Deserialize for User with fn deserialize(d) {
     }
   }
   {
-    name: @data.required(name, "name", d.path()),
-    age: @data.required(age, "age", d.path()),
+    name: @data.required(name, name="name", path=d.path()),
+    age: @data.required(age, name="age", path=d.path()),
     nickname,
   }
 }

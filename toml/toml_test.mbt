@@ -35,9 +35,9 @@ pub impl @data.Deserialize for Server with fn deserialize(d) {
     }
   }
   {
-    host: @data.required(host, "host", d.path()),
-    port: @data.required(port, "port", d.path()),
-    tags: @data.required(tags, "tags", d.path()),
+    host: @data.required(host, name="host", path=d.path()),
+    port: @data.required(port, name="port", path=d.path()),
+    tags: @data.required(tags, name="tags", path=d.path()),
     timeout,
   }
 }
@@ -69,8 +69,8 @@ pub impl @data.Deserialize for Config with fn deserialize(d) {
     }
   }
   {
-    name: @data.required(name, "name", d.path()),
-    server: @data.required(server, "server", d.path()),
+    name: @data.required(name, name="name", path=d.path()),
+    server: @data.required(server, name="server", path=d.path()),
   }
 }
 

@@ -149,7 +149,7 @@ fn JsonDeserializer::invalid_value_error(
 fn JsonDeserializer::unknown_variant_error(
   self : JsonDeserializer,
   variant : String,
-  expected : Array[String],
+  expected : ReadOnlyArray[String],
 ) -> @data.DeError {
   @data.UnknownVariant(path=self.current_path(), variant~, expected~)
 }
@@ -562,7 +562,7 @@ fn JsonDeserializer::spells(
 /// them is still consumed, so the error can name it.
 fn JsonDeserializer::variant_index(
   self : JsonDeserializer,
-  variants : Array[String],
+  variants : ReadOnlyArray[String],
 ) -> Int raise @data.DeError {
   let (start, end, clean) = self.string_extent()
   if clean {

@@ -24,7 +24,7 @@ pub fn TomlDeserializer::deserialize_byte(Self) -> Byte raise @data.DeError
 pub fn TomlDeserializer::deserialize_bytes(Self) -> Bytes raise @data.DeError
 pub fn TomlDeserializer::deserialize_char(Self) -> Char raise @data.DeError
 pub fn TomlDeserializer::deserialize_double(Self) -> Double raise @data.DeError
-pub fn TomlDeserializer::deserialize_enum_begin(Self, String, Array[String]) -> Int raise @data.DeError
+pub fn TomlDeserializer::deserialize_enum_begin(Self, String, ReadOnlyArray[String]) -> Int raise @data.DeError
 pub fn TomlDeserializer::deserialize_enum_end(Self) -> Unit raise @data.DeError
 pub fn[F : @data.FieldIdentifier] TomlDeserializer::deserialize_field(Self) -> F? raise @data.DeError
 pub fn TomlDeserializer::deserialize_field_name(Self) -> String? raise @data.DeError

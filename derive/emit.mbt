@@ -323,7 +323,7 @@ fn field_value(field : Field, indent : String) -> String {
   } else if field.optional {
     "f_\{field.ident}"
   } else {
-    "match f_\{field.ident} {\n\{indent}  Some(value) => value\n\{indent}  None => @data.required(None, \{quote(field.name)}, deserializer.path())\n\{indent}}"
+    "match f_\{field.ident} {\n\{indent}  Some(value) => value\n\{indent}  None => @data.required(None, name=\{quote(field.name)}, path=deserializer.path())\n\{indent}}"
   }
 }
 
@@ -490,7 +490,9 @@ fn write_deserialize(out : StringBuilder, target : Target) -> Unit {
     }
     Variant(cases) => {
       let names = cases.map(c => quote(c.name))
-      out.write_string("  let variants = [\{names.join(", ")}]\n")
+      out.write_string(
+        "  let variants : ReadOnlyArray[String] = [\{names.join(", ")}]\n",
+      )
       out.write_string(
         "  let value = match deserializer.deserialize_enum_begin(\{quote(target.name)}, variants) {\n",
       )

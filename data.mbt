@@ -40,7 +40,7 @@ pub fn[T : Deserialize] from_value(value : Value) -> T raise DeError {
 ///
 /// Hand-written `Deserialize` implementations accumulate fields into options
 /// and finish by unwrapping them through this.
-pub fn[T] required(field : T?, name : String, path : Path) -> T raise DeError {
+pub fn[T] required(field : T?, name~ : String, path~ : Path) -> T raise DeError {
   match field {
     Some(v) => v
     None => raise MissingField(path~, field=name)

@@ -246,8 +246,8 @@ pub impl @data.Deserialize for Point with fn deserialize(d) {
     }
   }
   {
-    x: @data.required(x, "x", d.path()),
-    y: @data.required(y, "y", d.path()),
+    x: @data.required(x, name="x", path=d.path()),
+    y: @data.required(y, name="y", path=d.path()),
     label,
   }
 }
@@ -287,7 +287,7 @@ pub impl @data.Serialize for Shape with fn serialize(self, s) {
 
 ///|
 pub impl @data.Deserialize for Shape with fn deserialize(d) {
-  let variants = ["Empty", "Circle", "Rect", "Tagged"]
+  let variants : ReadOnlyArray[String] = ["Empty", "Circle", "Rect", "Tagged"]
   let shape = match d.deserialize_enum_begin("Shape", variants) {
     0 => {
       d.deserialize_unit_variant()
@@ -313,8 +313,8 @@ pub impl @data.Deserialize for Shape with fn deserialize(d) {
         }
       }
       Tagged(
-        name=@data.required(name, "name", d.path()),
-        size=@data.required(size, "size", d.path()),
+        name=@data.required(name, name="name", path=d.path()),
+        size=@data.required(size, name="size", path=d.path()),
       )
     }
     index =>

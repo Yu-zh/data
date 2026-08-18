@@ -117,7 +117,7 @@ test "a record derives both directions" {
       #|  {
       #|    x: match f_x {
       #|      Some(value) => value
-      #|      None => @data.required(None, "x", deserializer.path())
+      #|      None => @data.required(None, name="x", path=deserializer.path())
       #|    },
       #|    label: f_label,
       #|  }
@@ -220,7 +220,7 @@ test "rename and skip change the wire form, not the type" {
       #|  {
       #|    max_retries: match f_max_retries {
       #|      Some(value) => value
-      #|      None => @data.required(None, "max-retries", deserializer.path())
+      #|      None => @data.required(None, name="max-retries", path=deserializer.path())
       #|    },
       #|    cached: Default::default(),
       #|  }
@@ -331,7 +331,7 @@ test "all four variant shapes" {
       #|
       #|///|
       #|pub impl @data.Deserialize for Shape with fn deserialize(deserializer) {
-      #|  let variants = ["Empty", "Circle", "Rect", "Tagged"]
+      #|  let variants : ReadOnlyArray[String] = ["Empty", "Circle", "Rect", "Tagged"]
       #|  let value = match deserializer.deserialize_enum_begin("Shape", variants) {
       #|    0 => {
       #|      deserializer.deserialize_unit_variant()
@@ -359,11 +359,11 @@ test "all four variant shapes" {
       #|      Tagged(
       #|        name=match f_name {
       #|          Some(value) => value
-      #|          None => @data.required(None, "name", deserializer.path())
+      #|          None => @data.required(None, name="name", path=deserializer.path())
       #|        },
       #|        size=match f_size {
       #|          Some(value) => value
-      #|          None => @data.required(None, "size", deserializer.path())
+      #|          None => @data.required(None, name="size", path=deserializer.path())
       #|        },
       #|      )
       #|    }
@@ -478,11 +478,11 @@ test "generic types get a bound per parameter" {
       #|  {
       #|    first: match f_first {
       #|      Some(value) => value
-      #|      None => @data.required(None, "first", deserializer.path())
+      #|      None => @data.required(None, name="first", path=deserializer.path())
       #|    },
       #|    second: match f_second {
       #|      Some(value) => value
-      #|      None => @data.required(None, "second", deserializer.path())
+      #|      None => @data.required(None, name="second", path=deserializer.path())
       #|    },
       #|  }
       #|}
