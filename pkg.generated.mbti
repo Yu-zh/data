@@ -133,7 +133,8 @@ pub(open) trait Deserializer {
   fn deserialize_map_begin(Self) -> Int? raise DeError
   fn[K : Deserialize] deserialize_map_next_key(Self) -> K? raise DeError
   fn[V : Deserialize] deserialize_map_value(Self) -> V raise DeError
-  fn deserialize_struct_begin(Self, String, Array[String]) -> Unit raise DeError
+  fn deserialize_struct_begin(Self, String, ReadOnlyArray[String]) -> Unit raise DeError
+  fn[F : FieldIdentifier] deserialize_field(Self) -> F? raise DeError = _
   fn deserialize_field_name(Self) -> String? raise DeError
   fn[T : Deserialize] deserialize_field_value(Self) -> T raise DeError
   fn skip_value(Self) -> Unit raise DeError
@@ -143,6 +144,13 @@ pub(open) trait Deserializer {
   fn deserialize_enum_end(Self) -> Unit raise DeError = _
   fn deserialize_any(Self) -> Value raise DeError
   fn is_human_readable(Self) -> Bool = _
+}
+
+pub(open) trait FieldIdentifier {
+  fn from_index(Int) -> Self
+  fn from_bytes(BytesView, Int) -> Self
+  fn from_string(String) -> Self
+  fn name(Self) -> String?
 }
 
 pub(open) trait Serialize {

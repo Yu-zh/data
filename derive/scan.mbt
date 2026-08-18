@@ -133,6 +133,20 @@ fn scan_fields(
     let (name, skip) = read_member_attributes(field.attrs, where_, ident)
     out.push({ ident, name, optional: field.ty is Option(..), skip })
   }
+  for index, field in out {
+    if field.skip {
+      continue
+    }
+    for previous in 0..<index {
+      let other = out[previous]
+      if !other.skip && other.name == field.name {
+        raise DeriveError(
+          where_~,
+          message="fields `\{other.ident}` and `\{field.ident}` both serialize as `\{field.name}`",
+        )
+      }
+    }
+  }
   out
 }
 

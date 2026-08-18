@@ -70,9 +70,8 @@ priv struct Scope {
   base_depth : Int
   mut count : Int
   /// The field names the caller declared for this struct, empty for arrays
-  /// and maps. Matching a key against these lets `deserialize_field_name`
-  /// hand back the caller's own `String` rather than building a new one.
-  expected : Array[String]
+  /// and maps. Known raw keys reuse these canonical strings for paths.
+  expected : ReadOnlyArray[String]
 }
 
 ///|
@@ -533,10 +532,10 @@ fn JsonDeserializer::parse_string(
 }
 
 ///|
-/// Whether the raw bytes in `start..end` spell `name`.
+/// Whether the raw bytes in `start..end` spell an enum variant `name`.
 ///
-/// Declared field and variant names are ASCII in practice; a non-ASCII one
-/// simply fails to match here and takes the decoding path.
+/// A non-ASCII variant simply fails to match here and takes the decoded slow
+/// path. Struct dispatch uses `FieldIdentifier::from_bytes` instead.
 fn JsonDeserializer::spells(
   self : JsonDeserializer,
   start : Int,
@@ -556,17 +555,11 @@ fn JsonDeserializer::spells(
 }
 
 ///|
-/// Reads an identifier the caller has already named.
-///
-/// On a match the caller's own `String` is returned — the same object, not a
-/// copy — so a known field or variant costs no allocation at all. Only an
-/// unrecognised or escaped name is materialised.
 /// The position of the upcoming string within `variants`.
 ///
-/// The same scan `identifier` does, returning where it landed instead of what
-/// it found — which is what `deserialize_enum_begin` wants, and is one scan
-/// rather than the match-then-`contains` pair this replaced. A string that is
-/// not among them is still consumed, so the error can name it.
+/// This returns where the byte-wise scan landed instead of what it found,
+/// which is what `deserialize_enum_begin` wants. A string that is not among
+/// them is still consumed, so the error can name it.
 fn JsonDeserializer::variant_index(
   self : JsonDeserializer,
   variants : Array[String],
@@ -593,9 +586,14 @@ fn JsonDeserializer::variant_index(
 }
 
 ///|
+/// Reads a struct identifier the caller has already named.
+///
+/// On a match the caller's canonical `String` is returned, so a known clean
+/// field costs no allocation or transcoding. Only an unrecognised or escaped
+/// name is materialised.
 fn JsonDeserializer::identifier(
   self : JsonDeserializer,
-  expected : Array[String],
+  expected : ReadOnlyArray[String],
 ) -> String raise @data.DeError {
   let (start, end, clean) = self.string_extent()
   if clean {
@@ -915,12 +913,12 @@ fn JsonDeserializer::int_in_range(
 // ---- scopes ----
 
 ///|
-let no_fields : Array[String] = []
+let no_fields : ReadOnlyArray[String] = []
 
 ///|
 fn JsonDeserializer::push_scope(
   self : JsonDeserializer,
-  expected : Array[String],
+  expected : ReadOnlyArray[String],
 ) -> Unit {
   self.scopes.push({ base_depth: self.path.depth, count: 0, expected })
 }
@@ -1166,6 +1164,20 @@ pub impl @data.Deserializer for JsonDeserializer with fn deserialize_string(
 
 ///|
 /// The mirror of writing bytes as an array of numbers.
+/// EXPERIMENT: the read counterpart of `serialize_str_bytes`, handing back the
+/// input's own bytes instead of decoding them into a `String`. Mirrors
+/// `deserialize_string` exactly, minus the decode.
+pub impl @data.Deserializer for JsonDeserializer with fn deserialize_str_bytes(
+  self,
+) {
+  if self.bare is Some(raw) {
+    raw
+  } else {
+    self.parse_string_bytes()
+  }
+}
+
+///|
 pub impl @data.Deserializer for JsonDeserializer with fn deserialize_bytes(self) {
   guard self.peek() == 0x5B else { self.mismatch("byte string") }
   self.pos = self.pos + 1
@@ -1262,6 +1274,36 @@ pub impl @data.Deserializer for JsonDeserializer with fn deserialize_field_name(
   self.set_key(scope.base_depth, name)
   scope.count = scope.count + 1
   Some(name)
+}
+
+///|
+pub impl @data.Deserializer for JsonDeserializer with fn deserialize_field(self) {
+  guard self.next_item(0x7D) else { return None }
+  let scope = self.top_scope()
+  let (start, end, clean) = self.string_extent()
+  if clean {
+    let key = self.input[start:end]
+    let field = @data.FieldIdentifier::from_bytes(key, scope.count)
+    match @data.FieldIdentifier::name(field) {
+      Some(name) => {
+        self.pos = end + 1
+        self.expect(':')
+        self.set_key(scope.base_depth, name)
+        scope.count = scope.count + 1
+        return Some(field)
+      }
+      None => ()
+    }
+  }
+  let name = self.parse_string()
+  let field = @data.FieldIdentifier::from_string(name)
+  self.expect(':')
+  match @data.FieldIdentifier::name(field) {
+    Some(canonical) => self.set_key(scope.base_depth, canonical)
+    None => self.set_key(scope.base_depth, name)
+  }
+  scope.count = scope.count + 1
+  Some(field)
 }
 
 ///|

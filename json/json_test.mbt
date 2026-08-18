@@ -43,6 +43,72 @@ pub impl @data.Deserialize for Point with fn deserialize(d) {
 }
 
 ///|
+priv enum IndexedField {
+  Name
+  Naive
+  Unknown
+}
+
+///|
+impl @data.FieldIdentifier for IndexedField with fn from_index(index) {
+  match index {
+    0 => Name
+    1 => Naive
+    _ => Unknown
+  }
+}
+
+///|
+impl @data.FieldIdentifier for IndexedField with fn from_bytes(key, _index_hint) {
+  if key.equal_to_bytes(b"name") {
+    Name
+  } else if key.equal_to_bytes(b"na\xc3\xafve") {
+    Naive
+  } else {
+    Unknown
+  }
+}
+
+///|
+impl @data.FieldIdentifier for IndexedField with fn from_string(name) {
+  match name {
+    "name" => Name
+    "naïve" => Naive
+    _ => Unknown
+  }
+}
+
+///|
+impl @data.FieldIdentifier for IndexedField with fn name(self) {
+  match self {
+    Name => Some("name")
+    Naive => Some("naïve")
+    Unknown => None
+  }
+}
+
+///|
+test "semantic field dispatch handles reorder, escapes, and unknown keys" {
+  let fields : ReadOnlyArray[String] = ["name", "naïve"]
+  let d = @json.JsonDeserializer::new(
+    @utf8.encode("{\"extra\":{\"deep\":true},\"na\\u006de\":7,\"naïve\":9}"),
+  )
+  d.deserialize_struct_begin("Indexed", fields)
+  let mut name = 0
+  let mut naive = 0
+  while (d.deserialize_field() : IndexedField?) is Some(field) {
+    match field {
+      Name => name = d.deserialize_field_value()
+      Naive => naive = d.deserialize_field_value()
+      Unknown => d.skip_value()
+    }
+  }
+  d.finish()
+  assert_eq(name, 7)
+  assert_eq(naive, 9)
+}
+
+///|
 pub(all) enum Shape {
   Empty
   Circle(Double)

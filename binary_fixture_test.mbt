@@ -357,11 +357,11 @@ impl @data.Serializer for BinSerializer with fn is_human_readable(_self) {
 /// One open struct, serving field names the wire never carried.
 ///
 /// This is the `fields` trick that stands in for serde's `visit_seq` on a
-/// struct visitor: the type declares the names, the format replays them in
-/// order, and the generated `match` rediscovers an index the cursor already
-/// had.
+/// struct visitor: the type declares the fields and the format supplies their
+/// positions in order. `FieldIdentifier::from_index` turns each position into
+/// the type's private semantic field enum.
 priv struct FieldCursor {
-  names : Array[String]
+  names : ReadOnlyArray[String]
   mut next : Int
 }
 
@@ -369,7 +369,7 @@ priv struct FieldCursor {
 /// Reads the encoding above.
 ///
 /// Unlike the serializer this does need stacks — not for delimiters, which do
-/// not exist, but because `deserialize_seq_next` and `deserialize_field_name`
+/// not exist, but because `deserialize_seq_next` and `deserialize_field`
 /// have to answer "is there more?" from a count rather than from a lookahead.
 struct BinDeserializer {
   input : Bytes
@@ -666,7 +666,9 @@ impl @data.Deserializer for BinDeserializer with fn deserialize_struct_begin(
 }
 
 ///|
-impl @data.Deserializer for BinDeserializer with fn deserialize_field_name(self) {
+fn BinDeserializer::next_field_index(
+  self : BinDeserializer,
+) -> Int? raise @data.DeError {
   let top = self.fields.length() - 1
   guard top >= 0 else {
     raise @data.DeCustom(path=Root, message="bin: field outside a struct")
@@ -676,9 +678,31 @@ impl @data.Deserializer for BinDeserializer with fn deserialize_field_name(self)
     let _ = self.fields.pop()
     None
   } else {
-    let name = cursor.names[cursor.next]
+    let index = cursor.next
     cursor.next = cursor.next + 1
-    Some(name)
+    Some(index)
+  }
+}
+
+///|
+impl @data.Deserializer for BinDeserializer with fn deserialize_field(self) {
+  match self.next_field_index() {
+    Some(index) => Some(@data.FieldIdentifier::from_index(index))
+    None => None
+  }
+}
+
+///|
+/// The decoded-name compatibility path for hand-written consumers.
+impl @data.Deserializer for BinDeserializer with fn deserialize_field_name(self) {
+  let top = self.fields.length() - 1
+  guard top >= 0 else {
+    raise @data.DeCustom(path=Root, message="bin: field outside a struct")
+  }
+  let cursor = self.fields[top]
+  match self.next_field_index() {
+    Some(index) => Some(cursor.names[index])
+    None => None
   }
 }
 
@@ -694,8 +718,8 @@ impl @data.Deserializer for BinDeserializer with fn deserialize_field_value(
 ///
 /// Skipping needs to know how many bytes a value occupies, which is precisely
 /// what a non-self-describing format does not record. It stays unreachable
-/// because `deserialize_field_name` only ever returns names drawn from the
-/// type's own `fields`, so the generated `_ =>` arm has nothing to match.
+/// because `deserialize_field` only supplies positions declared by the type,
+/// so the generated `Unknown` arm has nothing to match.
 impl @data.Deserializer for BinDeserializer with fn skip_value(_self) {
   raise @data.DeCustom(
     path=Root,

@@ -14,14 +14,16 @@ priv struct Scope {
   mut remaining : Int
   /// How many have been read, for the path of the next one.
   mut count : Int
-  /// The field names the caller declared, empty for arrays and maps. Matching
-  /// against these lets `deserialize_field_name` hand back the caller's own
-  /// `String` rather than building a new one, as the JSON reader does.
-  expected : Array[String]
+  /// The immutable field names the caller declared, empty for arrays and
+  /// maps. Known keys reuse these canonical strings for paths.
+  expected : ReadOnlyArray[String]
 }
 
 ///|
 const INDEFINITE : Int = -1
+
+///|
+let no_fields : ReadOnlyArray[String] = []
 
 ///|
 /// One open enum, remembering the path to restore on the way out.
@@ -370,10 +372,10 @@ fn CborDeserializer::take(
 }
 
 ///|
-fn CborDeserializer::text(
+fn CborDeserializer::decode_text(
   self : CborDeserializer,
+  view : BytesView,
 ) -> String raise @data.DeError {
-  let view = self.blob(TEXT, "string")
   @utf8.decode(view) catch {
     _ =>
       raise @data.InvalidValue(
@@ -384,6 +386,13 @@ fn CborDeserializer::text(
   }
 }
 
+///|
+fn CborDeserializer::text(
+  self : CborDeserializer,
+) -> String raise @data.DeError {
+  self.decode_text(self.blob(TEXT, "string"))
+}
+
 // ---- container bookkeeping ----
 
 ///|
@@ -391,7 +400,7 @@ fn CborDeserializer::open(
   self : CborDeserializer,
   major : Int,
   what : String,
-  expected : Array[String],
+  expected : ReadOnlyArray[String],
 ) -> Int? raise @data.DeError {
   let h = self.expect_head(major, what)
   let remaining = if h.indefinite {
@@ -580,7 +589,7 @@ pub impl @data.Deserializer for CborDeserializer with fn deserialize_option(
 pub impl @data.Deserializer for CborDeserializer with fn deserialize_seq_begin(
   self,
 ) {
-  self.open(ARRAY, "sequence", [])
+  self.open(ARRAY, "sequence", no_fields)
 }
 
 ///|
@@ -619,7 +628,7 @@ pub impl @data.Deserializer for CborDeserializer with fn deserialize_tuple_begin
       len
     },
     count: 0,
-    expected: [],
+    expected: no_fields,
   })
 }
 
@@ -658,7 +667,7 @@ pub impl @data.Deserializer for CborDeserializer with fn deserialize_tuple_end(
 pub impl @data.Deserializer for CborDeserializer with fn deserialize_map_begin(
   self,
 ) {
-  self.open(MAP, "map", [])
+  self.open(MAP, "map", no_fields)
 }
 
 ///|
@@ -694,18 +703,28 @@ pub impl @data.Deserializer for CborDeserializer with fn deserialize_field_name(
   guard self.next_item() else { return None }
   let scope = self.top()
   let name = self.text()
-  // Hand back the caller's own `String` when it matches, so the generated
-  // `match` compares against something it already holds.
-  let mut interned = name
-  for candidate in scope.expected {
-    if candidate == name {
-      interned = candidate
-      break
-    }
+  let interned = match scope.expected.search(name) {
+    Some(index) => scope.expected[index]
+    None => name
   }
   self.path = scope.base.key(interned)
   scope.count = scope.count + 1
   Some(interned)
+}
+
+///|
+pub impl @data.Deserializer for CborDeserializer with fn deserialize_field(self) {
+  guard self.next_item() else { return None }
+  let scope = self.top()
+  let key = self.blob(TEXT, "string")
+  let field = @data.FieldIdentifier::from_bytes(key, scope.count)
+  let name = match @data.FieldIdentifier::name(field) {
+    Some(name) => name
+    None => self.decode_text(key)
+  }
+  self.path = scope.base.key(name)
+  scope.count = scope.count + 1
+  Some(field)
 }
 
 ///|

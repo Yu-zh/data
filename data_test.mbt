@@ -22,7 +22,7 @@ pub impl @data.Serialize for Point with fn serialize(self, s) {
 
 ///|
 pub impl @data.Deserialize for Point with fn deserialize(d) {
-  let fields = ["x", "y", "label"]
+  let fields : ReadOnlyArray[String] = ["x", "y", "label"]
   d.deserialize_struct_begin("Point", fields)
   let mut x : Int? = None
   let mut y : Int? = None

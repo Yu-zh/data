@@ -11,17 +11,78 @@ pub impl @data.Serialize for Point with fn serialize(self, serializer) {
 }
 
 ///|
+let __data_record_fields_Point : ReadOnlyArray[String] = ["x", "y", "label"]
+
+///|
+priv enum DataRecordFieldPoint {
+  Field_x
+  Field_y
+  Field_label
+  Unknown
+}
+
+///|
+impl @data.FieldIdentifier for DataRecordFieldPoint with fn from_index(index) {
+  match index {
+    0 => Field_x
+    1 => Field_y
+    2 => Field_label
+    _ => Unknown
+  }
+}
+
+///|
+impl @data.FieldIdentifier for DataRecordFieldPoint with fn from_bytes(
+  key,
+  index_hint,
+) {
+  match index_hint {
+    0 if key.equal_to_bytes(b"x") => Field_x
+    1 if key.equal_to_bytes(b"y") => Field_y
+    2 if key.equal_to_bytes(b"label") => Field_label
+    _ =>
+      match key {
+        [0x78] => Field_x
+        [0x79] => Field_y
+        [0x6c, 0x61, 0x62, 0x65, 0x6c] => Field_label
+        _ => Unknown
+      }
+  }
+}
+
+///|
+impl @data.FieldIdentifier for DataRecordFieldPoint with fn from_string(name) {
+  match name {
+    "x" => Field_x
+    "y" => Field_y
+    "label" => Field_label
+    _ => Unknown
+  }
+}
+
+///|
+impl @data.FieldIdentifier for DataRecordFieldPoint with fn name(self) {
+  match self {
+    Field_x => Some("x")
+    Field_y => Some("y")
+    Field_label => Some("label")
+    Unknown => None
+  }
+}
+
+///|
 pub impl @data.Deserialize for Point with fn deserialize(deserializer) {
-  deserializer.deserialize_struct_begin("Point", ["x", "y", "label"])
+  deserializer.deserialize_struct_begin("Point", __data_record_fields_Point)
   let mut f_x = None
   let mut f_y = None
   let mut f_label = None
-  while deserializer.deserialize_field_name() is Some(field) {
+  while (deserializer.deserialize_field() : DataRecordFieldPoint?)
+        is Some(field) {
     match field {
-      "x" => f_x = Some(deserializer.deserialize_field_value())
-      "y" => f_y = Some(deserializer.deserialize_field_value())
-      "label" => f_label = deserializer.deserialize_field_value()
-      _ => deserializer.skip_value()
+      Field_x => f_x = Some(deserializer.deserialize_field_value())
+      Field_y => f_y = Some(deserializer.deserialize_field_value())
+      Field_label => f_label = deserializer.deserialize_field_value()
+      Unknown => deserializer.skip_value()
     }
   }
   {
@@ -45,14 +106,64 @@ pub impl @data.Serialize for Config with fn serialize(self, serializer) {
 }
 
 ///|
+let __data_record_fields_Config : ReadOnlyArray[String] = ["max-retries"]
+
+///|
+priv enum DataRecordFieldConfig {
+  Field_max_retries
+  Unknown
+}
+
+///|
+impl @data.FieldIdentifier for DataRecordFieldConfig with fn from_index(index) {
+  match index {
+    0 => Field_max_retries
+    _ => Unknown
+  }
+}
+
+///|
+impl @data.FieldIdentifier for DataRecordFieldConfig with fn from_bytes(
+  key,
+  index_hint,
+) {
+  match index_hint {
+    0 if key.equal_to_bytes(b"max-retries") => Field_max_retries
+    _ =>
+      match key {
+        [0x6d, 0x61, 0x78, 0x2d, 0x72, 0x65, 0x74, 0x72, 0x69, 0x65, 0x73] =>
+          Field_max_retries
+        _ => Unknown
+      }
+  }
+}
+
+///|
+impl @data.FieldIdentifier for DataRecordFieldConfig with fn from_string(name) {
+  match name {
+    "max-retries" => Field_max_retries
+    _ => Unknown
+  }
+}
+
+///|
+impl @data.FieldIdentifier for DataRecordFieldConfig with fn name(self) {
+  match self {
+    Field_max_retries => Some("max-retries")
+    Unknown => None
+  }
+}
+
+///|
 pub impl @data.Deserialize for Config with fn deserialize(deserializer) {
-  deserializer.deserialize_struct_begin("Config", ["max-retries"])
+  deserializer.deserialize_struct_begin("Config", __data_record_fields_Config)
   let mut f_max_retries = None
-  while deserializer.deserialize_field_name() is Some(field) {
+  while (deserializer.deserialize_field() : DataRecordFieldConfig?)
+        is Some(field) {
     match field {
-      "max-retries" =>
+      Field_max_retries =>
         f_max_retries = Some(deserializer.deserialize_field_value())
-      _ => deserializer.skip_value()
+      Unknown => deserializer.skip_value()
     }
   }
   {
@@ -109,6 +220,60 @@ pub impl @data.Serialize for Shape with fn serialize(self, serializer) {
 }
 
 ///|
+let __data_variant_fields_Shape_3 : ReadOnlyArray[String] = ["name", "size"]
+
+///|
+priv enum DataVariantFieldShape3 {
+  Field_name
+  Field_size
+  Unknown
+}
+
+///|
+impl @data.FieldIdentifier for DataVariantFieldShape3 with fn from_index(index) {
+  match index {
+    0 => Field_name
+    1 => Field_size
+    _ => Unknown
+  }
+}
+
+///|
+impl @data.FieldIdentifier for DataVariantFieldShape3 with fn from_bytes(
+  key,
+  index_hint,
+) {
+  match index_hint {
+    0 if key.equal_to_bytes(b"name") => Field_name
+    1 if key.equal_to_bytes(b"size") => Field_size
+    _ =>
+      match key {
+        [0x6e, 0x61, 0x6d, 0x65] => Field_name
+        [0x73, 0x69, 0x7a, 0x65] => Field_size
+        _ => Unknown
+      }
+  }
+}
+
+///|
+impl @data.FieldIdentifier for DataVariantFieldShape3 with fn from_string(name) {
+  match name {
+    "name" => Field_name
+    "size" => Field_size
+    _ => Unknown
+  }
+}
+
+///|
+impl @data.FieldIdentifier for DataVariantFieldShape3 with fn name(self) {
+  match self {
+    Field_name => Some("name")
+    Field_size => Some("size")
+    Unknown => None
+  }
+}
+
+///|
 pub impl @data.Deserialize for Shape with fn deserialize(deserializer) {
   let variants = ["Empty", "Circle", "Rect", "Tagged", "Ellipse"]
   let value = match deserializer.deserialize_enum_begin("Shape", variants) {
@@ -125,14 +290,17 @@ pub impl @data.Deserialize for Shape with fn deserialize(deserializer) {
       Rect(v0, v1)
     }
     3 => {
-      deserializer.deserialize_struct_begin("Tagged", ["name", "size"])
+      deserializer.deserialize_struct_begin(
+        "Tagged", __data_variant_fields_Shape_3,
+      )
       let mut f_name = None
       let mut f_size = None
-      while deserializer.deserialize_field_name() is Some(field) {
+      while (deserializer.deserialize_field() : DataVariantFieldShape3?)
+            is Some(field) {
         match field {
-          "name" => f_name = Some(deserializer.deserialize_field_value())
-          "size" => f_size = Some(deserializer.deserialize_field_value())
-          _ => deserializer.skip_value()
+          Field_name => f_name = Some(deserializer.deserialize_field_value())
+          Field_size => f_size = Some(deserializer.deserialize_field_value())
+          Unknown => deserializer.skip_value()
         }
       }
       Tagged(
@@ -176,18 +344,72 @@ pub impl[A : @data.Serialize, B : @data.Serialize] @data.Serialize for Pair[
 }
 
 ///|
+let __data_record_fields_Pair : ReadOnlyArray[String] = ["first", "second"]
+
+///|
+priv enum DataRecordFieldPair {
+  Field_first
+  Field_second
+  Unknown
+}
+
+///|
+impl @data.FieldIdentifier for DataRecordFieldPair with fn from_index(index) {
+  match index {
+    0 => Field_first
+    1 => Field_second
+    _ => Unknown
+  }
+}
+
+///|
+impl @data.FieldIdentifier for DataRecordFieldPair with fn from_bytes(
+  key,
+  index_hint,
+) {
+  match index_hint {
+    0 if key.equal_to_bytes(b"first") => Field_first
+    1 if key.equal_to_bytes(b"second") => Field_second
+    _ =>
+      match key {
+        [0x66, 0x69, 0x72, 0x73, 0x74] => Field_first
+        [0x73, 0x65, 0x63, 0x6f, 0x6e, 0x64] => Field_second
+        _ => Unknown
+      }
+  }
+}
+
+///|
+impl @data.FieldIdentifier for DataRecordFieldPair with fn from_string(name) {
+  match name {
+    "first" => Field_first
+    "second" => Field_second
+    _ => Unknown
+  }
+}
+
+///|
+impl @data.FieldIdentifier for DataRecordFieldPair with fn name(self) {
+  match self {
+    Field_first => Some("first")
+    Field_second => Some("second")
+    Unknown => None
+  }
+}
+
+///|
 pub impl[A : @data.Deserialize, B : @data.Deserialize] @data.Deserialize for Pair[
   A,
   B,
 ] with fn deserialize(deserializer) {
-  deserializer.deserialize_struct_begin("Pair", ["first", "second"])
+  deserializer.deserialize_struct_begin("Pair", __data_record_fields_Pair)
   let mut f_first = None
   let mut f_second = None
-  while deserializer.deserialize_field_name() is Some(field) {
+  while (deserializer.deserialize_field() : DataRecordFieldPair?) is Some(field) {
     match field {
-      "first" => f_first = Some(deserializer.deserialize_field_value())
-      "second" => f_second = Some(deserializer.deserialize_field_value())
-      _ => deserializer.skip_value()
+      Field_first => f_first = Some(deserializer.deserialize_field_value())
+      Field_second => f_second = Some(deserializer.deserialize_field_value())
+      Unknown => deserializer.skip_value()
     }
   }
   {

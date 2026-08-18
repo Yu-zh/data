@@ -220,6 +220,9 @@ pub(all) struct Point {
 } derive(Eq, Debug)
 
 ///|
+let point_fields : ReadOnlyArray[String] = ["x", "y", "label"]
+
+///|
 pub impl @data.Serialize for Point with fn serialize(self, s) {
   s.serialize_struct_begin("Point", 3)
   s.serialize_field("x", self.x)
@@ -230,13 +233,12 @@ pub impl @data.Serialize for Point with fn serialize(self, s) {
 
 ///|
 pub impl @data.Deserialize for Point with fn deserialize(d) {
-  let fields = ["x", "y", "label"]
-  d.deserialize_struct_begin("Point", fields)
+  d.deserialize_struct_begin("Point", point_fields)
   let mut x : Int? = None
   let mut y : Int? = None
   let mut label : String? = None
-  while d.deserialize_field_name() is Some(name) {
-    match name {
+  while d.deserialize_field_name() is Some(field) {
+    match field {
       "x" => x = Some(d.deserialize_field_value())
       "y" => y = Some(d.deserialize_field_value())
       "label" => label = d.deserialize_field_value()

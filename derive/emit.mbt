@@ -66,9 +66,206 @@ fn quote(text : String) -> String {
 }
 
 ///|
+fn hex_digit(n : Int) -> Char {
+  if n < 10 {
+    ('0'.to_int() + n).unsafe_to_char()
+  } else {
+    ('a'.to_int() + n - 10).unsafe_to_char()
+  }
+}
+
+///|
+/// Renders a UTF-8 byte literal without relying on the generated source file's
+/// text encoding. Printable ASCII stays readable; everything else uses `\xNN`.
+fn byte_quote(text : String) -> String {
+  let out = StringBuilder::new()
+  out.write_string("b\"")
+  for byte in @utf8.encode(text) {
+    let n = byte.to_int()
+    match n {
+      0x22 => out.write_string("\\\"")
+      0x5C => out.write_string("\\\\")
+      _ =>
+        if n >= 0x20 && n <= 0x7E {
+          out.write_char(n.unsafe_to_char())
+        } else {
+          out.write_string("\\x")
+          out.write_char(hex_digit(n >> 4))
+          out.write_char(hex_digit(n & 0x0F))
+        }
+    }
+  }
+  out.write_char('"')
+  out.to_string()
+}
+
+///|
+fn byte_pattern(text : String) -> String {
+  let out = StringBuilder::new()
+  out.write_char('[')
+  for index, byte in @utf8.encode(text) {
+    if index > 0 {
+      out.write_string(", ")
+    }
+    let n = byte.to_int()
+    out.write_string("0x")
+    out.write_char(hex_digit(n >> 4))
+    out.write_char(hex_digit(n & 0x0F))
+  }
+  out.write_char(']')
+  out.to_string()
+}
+
+///|
 fn name_list(fields : Array[Field]) -> String {
   let names = fields.filter(f => !f.skip).map(f => quote(f.name))
   "[\{names.join(", ")}]"
+}
+
+///|
+fn record_field_names_name(target : Target) -> String {
+  "__data_record_fields_\{target.name}"
+}
+
+///|
+fn variant_field_names_name(target : Target, index : Int) -> String {
+  "__data_variant_fields_\{target.name}_\{index}"
+}
+
+///|
+fn record_field_identifier_name(target : Target) -> String {
+  "DataRecordField\{target.name}"
+}
+
+///|
+fn variant_field_identifier_name(target : Target, index : Int) -> String {
+  "DataVariantField\{target.name}\{index}"
+}
+
+///|
+fn field_case(field : Field) -> String {
+  "Field_\{field.ident}"
+}
+
+///|
+fn unknown_field_case() -> String {
+  "Unknown"
+}
+
+///|
+/// Emits the generated equivalent of Serde's private `__Field` enum and its
+/// visitor. The declaration-order hint makes the common path one comparison;
+/// the fallback is an exact `BytesView` pattern match, giving MoonBit's match
+/// compiler the complete field set from which to build a decision tree.
+fn write_field_identifier(
+  out : StringBuilder,
+  identifier : String,
+  fields : Array[Field],
+) -> Unit {
+  let kept = fields.filter(field => !field.skip)
+  let unknown = unknown_field_case()
+  out.write_string("\n///|\n")
+  out.write_string("priv enum \{identifier} {\n")
+  for field in kept {
+    out.write_string("  \{field_case(field)}\n")
+  }
+  out.write_string("  Unknown\n")
+  out.write_string("}\n")
+  out.write_string("\n///|\n")
+  if kept.is_empty() {
+    out.write_string(
+      "impl @data.FieldIdentifier for \{identifier} with fn from_index(_index) {\n  \{unknown}\n}\n",
+    )
+    out.write_string("\n///|\n")
+    out.write_string(
+      "impl @data.FieldIdentifier for \{identifier} with fn from_bytes(_key, _index_hint) {\n  \{unknown}\n}\n",
+    )
+    out.write_string("\n///|\n")
+    out.write_string(
+      "impl @data.FieldIdentifier for \{identifier} with fn from_string(_name) {\n  \{unknown}\n}\n",
+    )
+  } else {
+    out.write_string(
+      "impl @data.FieldIdentifier for \{identifier} with fn from_index(index) {\n  match index {\n",
+    )
+    for index, field in kept {
+      out.write_string("    \{index} => \{field_case(field)}\n")
+    }
+    out.write_string("    _ => \{unknown}\n  }\n}\n")
+    out.write_string("\n///|\n")
+    out.write_string(
+      "impl @data.FieldIdentifier for \{identifier} with fn from_bytes(key, index_hint) {\n  match index_hint {\n",
+    )
+    for index, field in kept {
+      out.write_string(
+        "    \{index} if key.equal_to_bytes(\{byte_quote(field.name)}) => \{field_case(field)}\n",
+      )
+    }
+    out.write_string("    _ =>\n      match key {\n")
+    for field in kept {
+      out.write_string(
+        "        \{byte_pattern(field.name)} => \{field_case(field)}\n",
+      )
+    }
+    out.write_string("        _ => \{unknown}\n      }\n  }\n}\n")
+    out.write_string("\n///|\n")
+    out.write_string(
+      "impl @data.FieldIdentifier for \{identifier} with fn from_string(name) {\n  match name {\n",
+    )
+    for field in kept {
+      out.write_string("    \{quote(field.name)} => \{field_case(field)}\n")
+    }
+    out.write_string("    _ => \{unknown}\n  }\n}\n")
+  }
+  out.write_string("\n///|\n")
+  out.write_string(
+    "impl @data.FieldIdentifier for \{identifier} with fn name(self) {\n  match self {\n",
+  )
+  for field in kept {
+    out.write_string("    \{field_case(field)} => Some(\{quote(field.name)})\n")
+  }
+  out.write_string("    \{unknown} => None\n  }\n}\n")
+}
+
+///|
+fn write_field_metadata(
+  out : StringBuilder,
+  binding : String,
+  identifier : String,
+  fields : Array[Field],
+) -> Unit {
+  out.write_string("\n///|\n")
+  out.write_string(
+    "let \{binding} : ReadOnlyArray[String] = \{name_list(fields)}\n",
+  )
+  write_field_identifier(out, identifier, fields)
+}
+
+///|
+fn write_all_field_metadata(out : StringBuilder, target : Target) -> Unit {
+  match target.shape {
+    Record(fields) =>
+      write_field_metadata(
+        out,
+        record_field_names_name(target),
+        record_field_identifier_name(target),
+        fields,
+      )
+    Variant(cases) =>
+      for index, case_ in cases {
+        match case_.payload {
+          Struct(fields) =>
+            write_field_metadata(
+              out,
+              variant_field_names_name(target, index),
+              variant_field_identifier_name(target, index),
+              fields,
+            )
+          _ => ()
+        }
+      }
+    _ => ()
+  }
 }
 
 ///|
@@ -84,6 +281,7 @@ fn variant_info(target : Target, index : Int, case_ : Case) -> String {
 fn write_field_loop(
   out : StringBuilder,
   fields : Array[Field],
+  field_identifier : String,
   indent : String,
 ) -> Unit {
   for field in fields {
@@ -92,7 +290,7 @@ fn write_field_loop(
     }
   }
   out.write_string(
-    "\{indent}while deserializer.deserialize_field_name() is Some(field) {\n",
+    "\{indent}while (deserializer.deserialize_field() : \{field_identifier}?) is Some(field) {\n",
   )
   out.write_string("\{indent}  match field {\n")
   for field in fields {
@@ -108,10 +306,12 @@ fn write_field_loop(
       "Some(deserializer.deserialize_field_value())"
     }
     out.write_string(
-      "\{indent}    \{quote(field.name)} => f_\{field.ident} = \{rhs}\n",
+      "\{indent}    \{field_case(field)} => f_\{field.ident} = \{rhs}\n",
     )
   }
-  out.write_string("\{indent}    _ => deserializer.skip_value()\n")
+  out.write_string(
+    "\{indent}    \{unknown_field_case()} => deserializer.skip_value()\n",
+  )
   out.write_string("\{indent}  }\n")
   out.write_string("\{indent}}\n")
 }
@@ -237,10 +437,12 @@ fn write_deserialize(out : StringBuilder, target : Target) -> Unit {
         "  \{target.name}(deserializer.deserialize_newtype_struct(\{quote(target.name)}))\n",
       )
     Record(fields) => {
+      let field_names = record_field_names_name(target)
+      let field_identifier = record_field_identifier_name(target)
       out.write_string(
-        "  deserializer.deserialize_struct_begin(\{quote(target.name)}, \{name_list(fields)})\n",
+        "  deserializer.deserialize_struct_begin(\{quote(target.name)}, \{field_names})\n",
       )
-      write_field_loop(out, fields, "  ")
+      write_field_loop(out, fields, field_identifier, "  ")
       out.write_string("  {\n")
       for field in fields {
         out.write_string("    \{field.ident}: \{field_value(field, "    ")},\n")
@@ -294,11 +496,13 @@ fn write_deserialize(out : StringBuilder, target : Target) -> Unit {
             out.write_string("    }\n")
           }
           Struct(fields) => {
+            let field_names = variant_field_names_name(target, i)
+            let field_identifier = variant_field_identifier_name(target, i)
             out.write_string("    \{i} => {\n")
             out.write_string(
-              "      deserializer.deserialize_struct_begin(\{quote(case_.name)}, \{name_list(fields)})\n",
+              "      deserializer.deserialize_struct_begin(\{quote(case_.name)}, \{field_names})\n",
             )
-            write_field_loop(out, fields, "      ")
+            write_field_loop(out, fields, field_identifier, "      ")
             out.write_string("      \{case_.ident}(\n")
             for field in fields {
               out.write_string(
@@ -341,6 +545,7 @@ fn emit(targets : Array[Target]) -> String? {
       write_serialize(out, target)
     }
     if target.deserialize {
+      write_all_field_metadata(out, target)
       write_deserialize(out, target)
     }
   }

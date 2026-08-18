@@ -11,10 +11,13 @@ priv struct Scope {
   base : @data.Path
   mut remaining : Int
   mut count : Int
-  /// The field names the caller declared, empty for arrays and maps. Matching
-  /// against these hands back the caller's own `String` rather than a new one.
-  expected : Array[String]
+  /// The immutable field names the caller declared, empty for arrays and
+  /// maps. Known keys reuse these canonical strings for paths.
+  expected : ReadOnlyArray[String]
 }
+
+///|
+let no_fields : ReadOnlyArray[String] = []
 
 ///|
 priv struct EnumScope {
@@ -267,10 +270,10 @@ fn MsgpackDeserializer::str_bytes(
 }
 
 ///|
-fn MsgpackDeserializer::text(
+fn MsgpackDeserializer::decode_text(
   self : MsgpackDeserializer,
+  view : BytesView,
 ) -> String raise @data.DeError {
-  let view = self.str_bytes()
   @utf8.decode(view) catch {
     _ =>
       raise @data.InvalidValue(
@@ -279,6 +282,13 @@ fn MsgpackDeserializer::text(
         found="raw bytes",
       )
   }
+}
+
+///|
+fn MsgpackDeserializer::text(
+  self : MsgpackDeserializer,
+) -> String raise @data.DeError {
+  self.decode_text(self.str_bytes())
 }
 
 ///|
@@ -303,7 +313,7 @@ fn MsgpackDeserializer::open(
   m16 : Int,
   m32 : Int,
   what : String,
-  expected : Array[String],
+  expected : ReadOnlyArray[String],
 ) -> Int raise @data.DeError {
   let m = self.marker()
   let n = if m >= fix && m < fix + 16 {
@@ -491,7 +501,7 @@ pub impl @data.Deserializer for MsgpackDeserializer with fn deserialize_option(
 pub impl @data.Deserializer for MsgpackDeserializer with fn deserialize_seq_begin(
   self,
 ) {
-  Some(self.open(0x90, 0xdc, 0xdd, "sequence", []))
+  Some(self.open(0x90, 0xdc, 0xdd, "sequence", no_fields))
 }
 
 ///|
@@ -513,7 +523,7 @@ pub impl @data.Deserializer for MsgpackDeserializer with fn deserialize_tuple_be
   self,
   len,
 ) {
-  let n = self.open(0x90, 0xdc, 0xdd, "sequence", [])
+  let n = self.open(0x90, 0xdc, 0xdd, "sequence", no_fields)
   guard n == len else {
     raise @data.InvalidLength(path=self.path, expected=len, found=n)
   }
@@ -543,7 +553,7 @@ pub impl @data.Deserializer for MsgpackDeserializer with fn deserialize_tuple_en
 pub impl @data.Deserializer for MsgpackDeserializer with fn deserialize_map_begin(
   self,
 ) {
-  Some(self.open(0x80, 0xde, 0xdf, "map", []))
+  Some(self.open(0x80, 0xde, 0xdf, "map", no_fields))
 }
 
 ///|
@@ -577,16 +587,30 @@ pub impl @data.Deserializer for MsgpackDeserializer with fn deserialize_field_na
   guard self.next_item() else { return None }
   let scope = self.top()
   let name = self.text()
-  let mut interned = name
-  for candidate in scope.expected {
-    if candidate == name {
-      interned = candidate
-      break
-    }
+  let interned = match scope.expected.search(name) {
+    Some(index) => scope.expected[index]
+    None => name
   }
   self.path = scope.base.key(interned)
   scope.count = scope.count + 1
   Some(interned)
+}
+
+///|
+pub impl @data.Deserializer for MsgpackDeserializer with fn deserialize_field(
+  self,
+) {
+  guard self.next_item() else { return None }
+  let scope = self.top()
+  let key = self.str_bytes()
+  let field = @data.FieldIdentifier::from_bytes(key, scope.count)
+  let name = match @data.FieldIdentifier::name(field) {
+    Some(name) => name
+    None => self.decode_text(key)
+  }
+  self.path = scope.base.key(name)
+  scope.count = scope.count + 1
+  Some(field)
 }
 
 ///|
@@ -613,7 +637,7 @@ pub impl @data.Deserializer for MsgpackDeserializer with fn deserialize_enum_beg
   let m = self.peek()
   let wrapped = (m >= 0x80 && m < 0x90) || m == 0xde || m == 0xdf
   if wrapped {
-    let n = self.open(0x80, 0xde, 0xdf, "map", [])
+    let n = self.open(0x80, 0xde, 0xdf, "map", no_fields)
     guard n == 1 else {
       raise @data.DeCustom(
         path=base,
@@ -720,7 +744,7 @@ fn MsgpackDeserializer::parse_any(
 fn MsgpackDeserializer::any_seq(
   self : MsgpackDeserializer,
 ) -> @data.Value raise @data.DeError {
-  let n = self.open(0x90, 0xdc, 0xdd, "sequence", [])
+  let n = self.open(0x90, 0xdc, 0xdd, "sequence", no_fields)
   let items = []
   for _ in 0..<n {
     items.push(self.parse_any())
@@ -733,7 +757,7 @@ fn MsgpackDeserializer::any_seq(
 fn MsgpackDeserializer::any_map(
   self : MsgpackDeserializer,
 ) -> @data.Value raise @data.DeError {
-  let n = self.open(0x80, 0xde, 0xdf, "map", [])
+  let n = self.open(0x80, 0xde, 0xdf, "map", no_fields)
   let entries = []
   for _ in 0..<n {
     let k = self.parse_any()

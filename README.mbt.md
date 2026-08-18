@@ -109,8 +109,11 @@ pub impl @data.Serialize for User with fn serialize(self, s) {
 }
 
 ///|
+let user_fields : ReadOnlyArray[String] = ["name", "age", "nickname"]
+
+///|
 pub impl @data.Deserialize for User with fn deserialize(d) {
-  d.deserialize_struct_begin("User", ["name", "age", "nickname"])
+  d.deserialize_struct_begin("User", user_fields)
   let mut name = None
   let mut age = None
   let mut nickname = None
@@ -132,7 +135,11 @@ pub impl @data.Deserialize for User with fn deserialize(d) {
 ```
 
 Note that no field type is ever named: type inference flows backward from the
-struct literal, so the accumulators need no annotations.
+struct literal, so the accumulators need no annotations. The format sees the
+ordinary immutable field-name array. Derived code additionally generates a
+private field enum implementing `FieldIdentifier`; byte-oriented formats can
+then map raw UTF-8 directly to semantic cases without exposing numeric indices
+or a lookup-table representation in the public API.
 
 That one pair of implementations now drives every format:
 
@@ -459,11 +466,13 @@ error rather than silently producing wrong output.
 **`Error` is concrete.** Serde's `Error` associated type becomes the concrete
 `SerError` and `DeError`, each carrying a `Path`.
 
-And one thing serde needs that this does not: **there is no `Visitor`.**
-MoonBit trait methods may carry their own type parameters, so
-`deserialize_seq_next` is generic in the element type and calls
-`T::deserialize` directly — which is the job `Visitor` and `DeserializeSeed`
-exist to do in Rust.
+There is no general value `Visitor`. MoonBit trait methods may carry their own
+type parameters, so `deserialize_seq_next` is generic in the element type and
+calls `T::deserialize` directly — which is the job Serde's `Visitor` and
+`DeserializeSeed` do in Rust. Struct fields are the narrow special case:
+`deserialize_field` is generic in `FieldIdentifier`, and derive generates a
+private semantic enum for that identifier, analogous to Serde's private field
+enum. A format may feed it an index, raw UTF-8, or an existing `String`.
 
 ## License
 

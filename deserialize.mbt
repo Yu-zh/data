@@ -84,8 +84,21 @@ pub(open) trait Deserializer {
   fn[K : Deserialize] deserialize_map_next_key(Self) -> K? raise DeError
   fn[V : Deserialize] deserialize_map_value(Self) -> V raise DeError
 
-  // ---- structs: `fields` lists the names the type knows about ----
-  fn deserialize_struct_begin(Self, String, Array[String]) -> Unit raise DeError
+  // ---- structs: `fields` describes the names the type knows about ----
+  fn deserialize_struct_begin(Self, String, ReadOnlyArray[String]) -> Unit raise DeError
+  /// Returns the next field as the semantic identifier chosen by the type.
+  ///
+  /// `None` terminates the struct. Derived implementations instantiate `F`
+  /// with a private enum, just as Serde derives a private field enum and asks
+  /// the format to visit it. Byte-oriented formats can override this method
+  /// to dispatch raw UTF-8 directly, without allocating a MoonBit `String`.
+  /// The default adapts the name-returning protocol for formats that only
+  /// implement that simpler path.
+  fn[F : FieldIdentifier] deserialize_field(Self) -> F? raise DeError = _
+  /// Returns the next decoded field name, or `None` at the end of the struct.
+  ///
+  /// This is the convenient protocol for hand-written consumers and the
+  /// compatibility mechanism behind the default `deserialize_field`.
   fn deserialize_field_name(Self) -> String? raise DeError
   fn[T : Deserialize] deserialize_field_value(Self) -> T raise DeError
   /// Discards the current field's value, for tolerating unknown fields.
@@ -145,6 +158,14 @@ impl Deserializer with fn deserialize_newtype_struct(self, _name) {
 ///|
 impl Deserializer with fn deserialize_tuple_struct_begin(self, _name, len) {
   self.deserialize_tuple_begin(len)
+}
+
+///|
+impl Deserializer with fn deserialize_field(self) {
+  match self.deserialize_field_name() {
+    None => None
+    Some(name) => Some(FieldIdentifier::from_string(name))
+  }
 }
 
 ///|
