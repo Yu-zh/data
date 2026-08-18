@@ -992,7 +992,7 @@ fn JsonDeserializer::parse_any(
         entries.push((@data.Str(key), self.parse_any()))
       }
       self.pos = self.pos + 1
-      Map(entries)
+      Map(ReadOnlyArray::from_array(entries))
     }
     0x5B => {
       self.pos = self.pos + 1
@@ -1004,7 +1004,7 @@ fn JsonDeserializer::parse_any(
         items.push(self.parse_any())
       }
       self.pos = self.pos + 1
-      Seq(items)
+      Seq(ReadOnlyArray::from_array(items))
     }
     0x22 => Str(self.parse_string_bytes())
     0x74 => {

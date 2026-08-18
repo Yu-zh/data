@@ -104,7 +104,7 @@ fn Table::to_value(self : Table) -> @data.Value {
     let key = @data.Value::Str(@utf8.encode(entry.0)[:])
     entries.push((key, node_to_value(entry.1)))
   }
-  @data.Map(entries)
+  @data.Map(ReadOnlyArray::from_array(entries))
 }
 
 ///|
@@ -112,7 +112,8 @@ fn node_to_value(node : Node) -> @data.Value {
   match node {
     Leaf(v) => v
     Sub(t) => t.to_value()
-    Arr(tables) => @data.Seq(tables.map(t => t.to_value()))
+    Arr(tables) =>
+      @data.Seq(ReadOnlyArray::from_array(tables.map(t => t.to_value())))
   }
 }
 
@@ -462,7 +463,7 @@ fn Parser::value(
         self.bump()
       }
     }
-    return @data.Seq(items)
+    return @data.Seq(ReadOnlyArray::from_array(items))
   }
   if c == 0x7B { // {
     self.bump()
@@ -488,7 +489,7 @@ fn Parser::value(
         self.bump()
       }
     }
-    return @data.Map(entries)
+    return @data.Map(ReadOnlyArray::from_array(entries))
   }
   // A bare token: boolean, number, or something TOML has that we do not. It is
   // ASCII by construction and short, so decoding it costs nothing.

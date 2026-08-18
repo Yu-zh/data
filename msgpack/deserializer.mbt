@@ -750,7 +750,7 @@ fn MsgpackDeserializer::any_seq(
     items.push(self.parse_any())
   }
   let _ = self.scopes.pop()
-  @data.Seq(items)
+  @data.Seq(ReadOnlyArray::from_array(items))
 }
 
 ///|
@@ -764,7 +764,7 @@ fn MsgpackDeserializer::any_map(
     entries.push((k, self.parse_any()))
   }
   let _ = self.scopes.pop()
-  @data.Map(entries)
+  @data.Map(ReadOnlyArray::from_array(entries))
 }
 
 ///|

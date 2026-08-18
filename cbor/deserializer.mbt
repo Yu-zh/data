@@ -845,7 +845,7 @@ fn CborDeserializer::parse_any(
           items.push(self.parse_any())
         }
       }
-      @data.Seq(items)
+      @data.Seq(ReadOnlyArray::from_array(items))
     }
     5 => {
       let entries = []
@@ -861,7 +861,7 @@ fn CborDeserializer::parse_any(
           entries.push((k, self.parse_any()))
         }
       }
-      @data.Map(entries)
+      @data.Map(ReadOnlyArray::from_array(entries))
     }
     _ =>
       match h.arg {

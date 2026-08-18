@@ -74,12 +74,15 @@ fn ValueSerializer::seq_items(
 }
 
 ///|
+/// Freezes the builder into the array a `Value` holds. The copy is the price of
+/// `Value` being acyclic by construction; it is paid once per container, and
+/// the builder is dropped immediately after.
 fn ValueSerializer::close_seq(
   self : ValueSerializer,
-) -> Array[Value] raise SerError {
+) -> ReadOnlyArray[Value] raise SerError {
   let items = self.seq_items()
   self.items = None
-  items
+  ReadOnlyArray::from_array(items)
 }
 
 ///|
@@ -95,10 +98,10 @@ fn ValueSerializer::map_entries(
 ///|
 fn ValueSerializer::close_map(
   self : ValueSerializer,
-) -> Array[(Value, Value)] raise SerError {
+) -> ReadOnlyArray[(Value, Value)] raise SerError {
   let entries = self.map_entries()
   self.entries = None
-  entries
+  ReadOnlyArray::from_array(entries)
 }
 
 ///|
@@ -407,7 +410,7 @@ fn ValueDeserializer::as_double(
 ///|
 fn ValueDeserializer::seq_items(
   self : ValueDeserializer,
-) -> Array[Value] raise DeError {
+) -> ReadOnlyArray[Value] raise DeError {
   guard self.value is Seq(items) else { self.mismatch("sequence") }
   items
 }
@@ -415,7 +418,7 @@ fn ValueDeserializer::seq_items(
 ///|
 fn ValueDeserializer::map_entries(
   self : ValueDeserializer,
-) -> Array[(Value, Value)] raise DeError {
+) -> ReadOnlyArray[(Value, Value)] raise DeError {
   guard self.value is Map(entries) else { self.mismatch("map") }
   entries
 }

@@ -16,6 +16,14 @@
 /// externally-tagged representation: a unit variant becomes `Str(name)`, and
 /// any variant with a payload becomes a single-entry `Map` from the variant
 /// name to its payload.
+///
+/// `Seq` and `Map` hold `ReadOnlyArray`, which makes a value a tree by
+/// construction: a cycle needs an already-built node to be pointed back at one
+/// of its ancestors, and nothing reachable from a `Value` can be written to
+/// after it is built. That is not only about traversals terminating. The
+/// native and LLVM backends are reference-counted, so a cycle would be a leak
+/// that no collector ever comes to clear. It also means a value never aliases
+/// the array it was built from.
 pub(all) enum Value {
   Null
   Boolean(Bool)
@@ -26,9 +34,9 @@ pub(all) enum Value {
   Double(Double)
   Str(BytesView)
   Bytes(Bytes)
-  Seq(Array[Value])
+  Seq(ReadOnlyArray[Value])
   /// Order-preserving, and keys need not be strings.
-  Map(Array[(Value, Value)])
+  Map(ReadOnlyArray[(Value, Value)])
 } derive(Eq, Debug)
 
 ///|

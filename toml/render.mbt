@@ -54,7 +54,7 @@ fn is_table_array(value : @data.Value) -> Bool {
 fn render_table(
   out : @buffer.Buffer,
   prefix : Array[BytesView],
-  entries : Array[(@data.Value, @data.Value)],
+  entries : ReadOnlyArray[(@data.Value, @data.Value)],
 ) -> Unit raise @data.SerError {
   // Pass one: the scalars, which have to precede any header.
   for entry in entries {

@@ -50,8 +50,8 @@ pub(all) enum Value {
   Double(Double)
   Str(BytesView)
   Bytes(Bytes)
-  Seq(Array[Value])
-  Map(Array[(Value, Value)])
+  Seq(ReadOnlyArray[Value])
+  Map(ReadOnlyArray[(Value, Value)])
 } derive(Eq, @debug.Debug)
 pub fn[D : Deserializer] Value::deserialize(D) -> Self raise DeError
 pub fn Value::detach(Self) -> Self
