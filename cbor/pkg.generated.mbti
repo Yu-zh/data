@@ -14,13 +14,96 @@ pub fn[T : @data.Serialize] to_bytes(T) -> Bytes raise @data.SerError
 
 // Types and methods
 type CborDeserializer
+pub fn CborDeserializer::deserialize_any(Self) -> @data.Value raise @data.DeError
+pub fn CborDeserializer::deserialize_bool(Self) -> Bool raise @data.DeError
+pub fn CborDeserializer::deserialize_byte(Self) -> Byte raise @data.DeError
+pub fn CborDeserializer::deserialize_bytes(Self) -> Bytes raise @data.DeError
+pub fn CborDeserializer::deserialize_char(Self) -> Char raise @data.DeError
+pub fn CborDeserializer::deserialize_double(Self) -> Double raise @data.DeError
+pub fn CborDeserializer::deserialize_enum_begin(Self, String, Array[String]) -> Int raise @data.DeError
+pub fn CborDeserializer::deserialize_enum_end(Self) -> Unit raise @data.DeError
+pub fn[F : @data.FieldIdentifier] CborDeserializer::deserialize_field(Self) -> F? raise @data.DeError
+pub fn CborDeserializer::deserialize_field_name(Self) -> String? raise @data.DeError
+pub fn[T : @data.Deserialize] CborDeserializer::deserialize_field_value(Self) -> T raise @data.DeError
+pub fn CborDeserializer::deserialize_float(Self) -> Float raise @data.DeError
+pub fn CborDeserializer::deserialize_int(Self) -> Int raise @data.DeError
+pub fn CborDeserializer::deserialize_int16(Self) -> Int16 raise @data.DeError
+pub fn CborDeserializer::deserialize_int64(Self) -> Int64 raise @data.DeError
+pub fn CborDeserializer::deserialize_map_begin(Self) -> Int? raise @data.DeError
+pub fn[K : @data.Deserialize] CborDeserializer::deserialize_map_next_key(Self) -> K? raise @data.DeError
+pub fn[V : @data.Deserialize] CborDeserializer::deserialize_map_value(Self) -> V raise @data.DeError
+pub fn[T : @data.Deserialize] CborDeserializer::deserialize_newtype_struct(Self, String) -> T raise @data.DeError
+pub fn[T : @data.Deserialize] CborDeserializer::deserialize_newtype_variant(Self) -> T raise @data.DeError
+pub fn[T : @data.Deserialize] CborDeserializer::deserialize_option(Self) -> T? raise @data.DeError
+pub fn CborDeserializer::deserialize_seq_begin(Self) -> Int? raise @data.DeError
+pub fn[T : @data.Deserialize] CborDeserializer::deserialize_seq_next(Self) -> T? raise @data.DeError
+pub fn CborDeserializer::deserialize_str_bytes(Self) -> BytesView raise @data.DeError
+pub fn CborDeserializer::deserialize_string(Self) -> String raise @data.DeError
+pub fn CborDeserializer::deserialize_struct_begin(Self, String, ReadOnlyArray[String]) -> Unit raise @data.DeError
+pub fn CborDeserializer::deserialize_tuple_begin(Self, Int) -> Unit raise @data.DeError
+pub fn CborDeserializer::deserialize_tuple_end(Self) -> Unit raise @data.DeError
+pub fn[T : @data.Deserialize] CborDeserializer::deserialize_tuple_next(Self) -> T raise @data.DeError
+pub fn CborDeserializer::deserialize_tuple_struct_begin(Self, String, Int) -> Unit raise @data.DeError
+pub fn CborDeserializer::deserialize_uint(Self) -> UInt raise @data.DeError
+pub fn CborDeserializer::deserialize_uint16(Self) -> UInt16 raise @data.DeError
+pub fn CborDeserializer::deserialize_uint64(Self) -> UInt64 raise @data.DeError
+pub fn CborDeserializer::deserialize_unit(Self) -> Unit raise @data.DeError
+pub fn CborDeserializer::deserialize_unit_struct(Self, String) -> Unit raise @data.DeError
+pub fn CborDeserializer::deserialize_unit_variant(Self) -> Unit raise @data.DeError
 pub fn CborDeserializer::finish(Self) -> Unit raise @data.DeError
+pub fn CborDeserializer::is_human_readable(Self) -> Bool
 pub fn CborDeserializer::new(Bytes) -> Self
+pub fn CborDeserializer::path(Self) -> @data.Path
+pub fn CborDeserializer::skip_value(Self) -> Unit raise @data.DeError
 pub impl @data.Deserializer for CborDeserializer
 
 type CborSerializer
 pub fn CborSerializer::finish(Self) -> Bytes raise @data.SerError
+pub fn CborSerializer::is_human_readable(Self) -> Bool
 pub fn CborSerializer::new() -> Self
+pub fn CborSerializer::serialize_bool(Self, Bool) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_byte(Self, Byte) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_bytes(Self, Bytes) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_char(Self, Char) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_double(Self, Double) -> Unit raise @data.SerError
+pub fn[T : @data.Serialize] CborSerializer::serialize_field(Self, String, T) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_float(Self, Float) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_int(Self, Int) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_int16(Self, Int16) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_int64(Self, Int64) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_map_begin(Self, Int?) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_map_end(Self) -> Unit raise @data.SerError
+pub fn[K : @data.Serialize] CborSerializer::serialize_map_key(Self, K) -> Unit raise @data.SerError
+pub fn[V : @data.Serialize] CborSerializer::serialize_map_value(Self, V) -> Unit raise @data.SerError
+pub fn[T : @data.Serialize] CborSerializer::serialize_newtype_struct(Self, String, T) -> Unit raise @data.SerError
+pub fn[T : @data.Serialize] CborSerializer::serialize_newtype_variant(Self, @data.VariantInfo, T) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_none(Self) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_seq_begin(Self, Int?) -> Unit raise @data.SerError
+pub fn[T : @data.Serialize] CborSerializer::serialize_seq_element(Self, T) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_seq_end(Self) -> Unit raise @data.SerError
+pub fn[T : @data.Serialize] CborSerializer::serialize_some(Self, T) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_str_bytes(Self, BytesView) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_string(Self, String) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_struct_begin(Self, String, Int) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_struct_end(Self) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_struct_variant_begin(Self, @data.VariantInfo, Int) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_struct_variant_end(Self) -> Unit raise @data.SerError
+pub fn[T : @data.Serialize] CborSerializer::serialize_struct_variant_field(Self, String, T) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_tuple_begin(Self, Int) -> Unit raise @data.SerError
+pub fn[T : @data.Serialize] CborSerializer::serialize_tuple_element(Self, T) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_tuple_end(Self) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_tuple_struct_begin(Self, String, Int) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_tuple_struct_end(Self) -> Unit raise @data.SerError
+pub fn[T : @data.Serialize] CborSerializer::serialize_tuple_struct_field(Self, T) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_tuple_variant_begin(Self, @data.VariantInfo, Int) -> Unit raise @data.SerError
+pub fn[T : @data.Serialize] CborSerializer::serialize_tuple_variant_element(Self, T) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_tuple_variant_end(Self) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_uint(Self, UInt) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_uint16(Self, UInt16) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_uint64(Self, UInt64) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_unit(Self) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_unit_struct(Self, String) -> Unit raise @data.SerError
+pub fn CborSerializer::serialize_unit_variant(Self, @data.VariantInfo) -> Unit raise @data.SerError
 pub impl @data.Serializer for CborSerializer
 
 // Type aliases

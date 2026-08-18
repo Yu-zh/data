@@ -4,8 +4,3 @@ import {
   "moonbitlang/core/float",
   "moonbitlang/core/encoding/utf8",
 }
-
-// Warning 79 (`implicit_impl_as_method`) is off project-wide; see the root
-// package's `moon.pkg` for why.
-
-warnings = "-79"
