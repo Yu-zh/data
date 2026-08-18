@@ -257,6 +257,16 @@ step — so generated files are committed alongside their sources and the
 generator is re-run by hand. It is idempotent, and CI can check nothing is
 stale with `moon run derive && git diff --exit-code`.
 
+Generated code is ordinary `impl Trait for Type` blocks, so a current toolchain
+raises warning 79 (`implicit_impl_as_method`) for each one, in a file nobody
+wrote by hand. The promotion it warns about is never used here: every generated
+method is reached through a trait bound. Silence it in the package the generated
+files land in, until the language settles:
+
+```
+warnings = "-79"
+```
+
 See the [`example`](example/) package for the whole loop: attributed types,
 their generated implementations, and round-trip tests.
 

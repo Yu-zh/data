@@ -1163,10 +1163,9 @@ pub impl @data.Deserializer for JsonDeserializer with fn deserialize_string(
 }
 
 ///|
-/// The mirror of writing bytes as an array of numbers.
-/// EXPERIMENT: the read counterpart of `serialize_str_bytes`, handing back the
-/// input's own bytes instead of decoding them into a `String`. Mirrors
-/// `deserialize_string` exactly, minus the decode.
+/// The read counterpart of `serialize_str_bytes`, handing back the input's own
+/// bytes instead of decoding them into a `String`. Mirrors `deserialize_string`
+/// exactly, minus the decode.
 pub impl @data.Deserializer for JsonDeserializer with fn deserialize_str_bytes(
   self,
 ) {
@@ -1178,6 +1177,7 @@ pub impl @data.Deserializer for JsonDeserializer with fn deserialize_str_bytes(
 }
 
 ///|
+/// The mirror of writing bytes as an array of numbers.
 pub impl @data.Deserializer for JsonDeserializer with fn deserialize_bytes(self) {
   guard self.peek() == 0x5B else { self.mismatch("byte string") }
   self.pos = self.pos + 1
