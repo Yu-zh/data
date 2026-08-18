@@ -109,3 +109,28 @@ pub extend ValueDeserializer with Deserializer::{
   path,
   skip_value,
 }
+
+///|
+#deprecated("use `==` and `!=`", skip_current_package=true)
+#doc(hidden)
+pub extend Path with Eq::{equal, not_equal}
+
+///|
+#deprecated("reach it through the `Debug` bound", skip_current_package=true)
+#doc(hidden)
+pub extend Path with @debug.Debug::{to_repr}
+
+///|
+#deprecated("reach it through the `Show` bound", skip_current_package=true)
+#doc(hidden)
+pub extend Path with Show::{output, to_string}
+
+///|
+#deprecated("reach it through the `Show` bound", skip_current_package=true)
+#doc(hidden)
+pub extend SerError with Show::{output, to_string}
+
+///|
+#deprecated("reach it through the `Show` bound", skip_current_package=true)
+#doc(hidden)
+pub extend DeError with Show::{output, to_string}
