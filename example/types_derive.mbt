@@ -11,6 +11,11 @@ pub impl @data.Serialize for Point with fn serialize(self, serializer) {
 }
 
 ///|
+#deprecated("reach it through the `Serialize` bound", skip_current_package=true)
+#doc(hidden)
+pub extend Point with @data.Serialize::{serialize}
+
+///|
 let __data_record_fields_Point : ReadOnlyArray[String] = ["x", "y", "label"]
 
 ///|
@@ -99,11 +104,21 @@ pub impl @data.Deserialize for Point with fn deserialize(deserializer) {
 }
 
 ///|
+#deprecated("reach it through the `Deserialize` bound", skip_current_package=true)
+#doc(hidden)
+pub extend Point with @data.Deserialize::{deserialize}
+
+///|
 pub impl @data.Serialize for Config with fn serialize(self, serializer) {
   serializer.serialize_struct_begin("Config", 1)
   serializer.serialize_field("max-retries", self.max_retries)
   serializer.serialize_struct_end()
 }
+
+///|
+#deprecated("reach it through the `Serialize` bound", skip_current_package=true)
+#doc(hidden)
+pub extend Config with @data.Serialize::{serialize}
 
 ///|
 let __data_record_fields_Config : ReadOnlyArray[String] = ["max-retries"]
@@ -176,6 +191,11 @@ pub impl @data.Deserialize for Config with fn deserialize(deserializer) {
 }
 
 ///|
+#deprecated("reach it through the `Deserialize` bound", skip_current_package=true)
+#doc(hidden)
+pub extend Config with @data.Deserialize::{deserialize}
+
+///|
 pub impl @data.Serialize for Shape with fn serialize(self, serializer) {
   match self {
     Empty =>
@@ -218,6 +238,11 @@ pub impl @data.Serialize for Shape with fn serialize(self, serializer) {
     }
   }
 }
+
+///|
+#deprecated("reach it through the `Serialize` bound", skip_current_package=true)
+#doc(hidden)
+pub extend Shape with @data.Serialize::{serialize}
 
 ///|
 let __data_variant_fields_Shape_3 : ReadOnlyArray[String] = ["name", "size"]
@@ -333,6 +358,11 @@ pub impl @data.Deserialize for Shape with fn deserialize(deserializer) {
 }
 
 ///|
+#deprecated("reach it through the `Deserialize` bound", skip_current_package=true)
+#doc(hidden)
+pub extend Shape with @data.Deserialize::{deserialize}
+
+///|
 pub impl[A : @data.Serialize, B : @data.Serialize] @data.Serialize for Pair[
   A,
   B,
@@ -342,6 +372,11 @@ pub impl[A : @data.Serialize, B : @data.Serialize] @data.Serialize for Pair[
   serializer.serialize_field("second", self.second)
   serializer.serialize_struct_end()
 }
+
+///|
+#deprecated("reach it through the `Serialize` bound", skip_current_package=true)
+#doc(hidden)
+pub extend Pair with @data.Serialize::{serialize}
 
 ///|
 let __data_record_fields_Pair : ReadOnlyArray[String] = ["first", "second"]
@@ -425,6 +460,11 @@ pub impl[A : @data.Deserialize, B : @data.Deserialize] @data.Deserialize for Pai
 }
 
 ///|
+#deprecated("reach it through the `Deserialize` bound", skip_current_package=true)
+#doc(hidden)
+pub extend Pair with @data.Deserialize::{deserialize}
+
+///|
 pub impl @data.Serialize for Rgb with fn serialize(self, serializer) {
   serializer.serialize_tuple_struct_begin("Rgb", 3)
   serializer.serialize_tuple_struct_field(self.0)
@@ -432,6 +472,11 @@ pub impl @data.Serialize for Rgb with fn serialize(self, serializer) {
   serializer.serialize_tuple_struct_field(self.2)
   serializer.serialize_tuple_struct_end()
 }
+
+///|
+#deprecated("reach it through the `Serialize` bound", skip_current_package=true)
+#doc(hidden)
+pub extend Rgb with @data.Serialize::{serialize}
 
 ///|
 pub impl @data.Deserialize for Rgb with fn deserialize(deserializer) {
@@ -444,9 +489,19 @@ pub impl @data.Deserialize for Rgb with fn deserialize(deserializer) {
 }
 
 ///|
+#deprecated("reach it through the `Deserialize` bound", skip_current_package=true)
+#doc(hidden)
+pub extend Rgb with @data.Deserialize::{deserialize}
+
+///|
 pub impl @data.Serialize for Meters with fn serialize(self, serializer) {
   serializer.serialize_newtype_struct("Meters", self.0)
 }
+
+///|
+#deprecated("reach it through the `Serialize` bound", skip_current_package=true)
+#doc(hidden)
+pub extend Meters with @data.Serialize::{serialize}
 
 ///|
 pub impl @data.Deserialize for Meters with fn deserialize(deserializer) {
@@ -454,12 +509,27 @@ pub impl @data.Deserialize for Meters with fn deserialize(deserializer) {
 }
 
 ///|
+#deprecated("reach it through the `Deserialize` bound", skip_current_package=true)
+#doc(hidden)
+pub extend Meters with @data.Deserialize::{deserialize}
+
+///|
 pub impl @data.Serialize for Marker with fn serialize(_self, serializer) {
   serializer.serialize_unit_struct("Marker")
 }
+
+///|
+#deprecated("reach it through the `Serialize` bound", skip_current_package=true)
+#doc(hidden)
+pub extend Marker with @data.Serialize::{serialize}
 
 ///|
 pub impl @data.Deserialize for Marker with fn deserialize(deserializer) {
   deserializer.deserialize_unit_struct("Marker")
   Marker::{  }
 }
+
+///|
+#deprecated("reach it through the `Deserialize` bound", skip_current_package=true)
+#doc(hidden)
+pub extend Marker with @data.Deserialize::{deserialize}

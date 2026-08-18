@@ -1,12 +1,8 @@
 import {
   "Yu-zh/data",
+  "moonbitlang/core/debug",
 }
 
 import {
   "Yu-zh/data/json",
 } for "test"
-
-// Warning 79 (`implicit_impl_as_method`) is off project-wide; see the root
-// package's `moon.pkg` for why.
-
-warnings = "-79"

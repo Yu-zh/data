@@ -47,6 +47,11 @@ test "a record derives both directions" {
       #|}
       #|
       #|///|
+      #|#deprecated("reach it through the `Serialize` bound", skip_current_package=true)
+      #|#doc(hidden)
+      #|pub extend Point with @data.Serialize::{serialize}
+      #|
+      #|///|
       #|let __data_record_fields_Point : ReadOnlyArray[String] = ["x", "label"]
       #|
       #|///|
@@ -118,6 +123,11 @@ test "a record derives both directions" {
       #|  }
       #|}
       #|
+      #|///|
+      #|#deprecated("reach it through the `Deserialize` bound", skip_current_package=true)
+      #|#doc(hidden)
+      #|pub extend Point with @data.Deserialize::{deserialize}
+      #|
     ),
   )
 }
@@ -146,6 +156,11 @@ test "rename and skip change the wire form, not the type" {
       #|  serializer.serialize_field("max-retries", self.max_retries)
       #|  serializer.serialize_struct_end()
       #|}
+      #|
+      #|///|
+      #|#deprecated("reach it through the `Serialize` bound", skip_current_package=true)
+      #|#doc(hidden)
+      #|pub extend Config with @data.Serialize::{serialize}
       #|
       #|///|
       #|let __data_record_fields_Config : ReadOnlyArray[String] = ["max-retries"]
@@ -211,6 +226,11 @@ test "rename and skip change the wire form, not the type" {
       #|  }
       #|}
       #|
+      #|///|
+      #|#deprecated("reach it through the `Deserialize` bound", skip_current_package=true)
+      #|#doc(hidden)
+      #|pub extend Config with @data.Deserialize::{deserialize}
+      #|
     ),
   )
 }
@@ -252,6 +272,11 @@ test "all four variant shapes" {
       #|    }
       #|  }
       #|}
+      #|
+      #|///|
+      #|#deprecated("reach it through the `Serialize` bound", skip_current_package=true)
+      #|#doc(hidden)
+      #|pub extend Shape with @data.Serialize::{serialize}
       #|
       #|///|
       #|let __data_variant_fields_Shape_3 : ReadOnlyArray[String] = ["name", "size"]
@@ -349,6 +374,11 @@ test "all four variant shapes" {
       #|  value
       #|}
       #|
+      #|///|
+      #|#deprecated("reach it through the `Deserialize` bound", skip_current_package=true)
+      #|#doc(hidden)
+      #|pub extend Shape with @data.Deserialize::{deserialize}
+      #|
     ),
   )
 }
@@ -376,6 +406,11 @@ test "generic types get a bound per parameter" {
       #|  serializer.serialize_field("second", self.second)
       #|  serializer.serialize_struct_end()
       #|}
+      #|
+      #|///|
+      #|#deprecated("reach it through the `Serialize` bound", skip_current_package=true)
+      #|#doc(hidden)
+      #|pub extend Pair with @data.Serialize::{serialize}
       #|
       #|///|
       #|let __data_record_fields_Pair : ReadOnlyArray[String] = ["first", "second"]
@@ -452,6 +487,11 @@ test "generic types get a bound per parameter" {
       #|  }
       #|}
       #|
+      #|///|
+      #|#deprecated("reach it through the `Deserialize` bound", skip_current_package=true)
+      #|#doc(hidden)
+      #|pub extend Pair with @data.Deserialize::{deserialize}
+      #|
     ),
   )
 }
@@ -479,6 +519,11 @@ test "a tuple struct rides the tuple-struct protocol" {
       #|}
       #|
       #|///|
+      #|#deprecated("reach it through the `Serialize` bound", skip_current_package=true)
+      #|#doc(hidden)
+      #|pub extend Rgb with @data.Serialize::{ serialize }
+      #|
+      #|///|
       #|pub impl @data.Deserialize for Rgb with deserialize(deserializer) {
       #|  deserializer.deserialize_tuple_struct_begin("Rgb", 3)
       #|  let v0 = deserializer.deserialize_tuple_next()
@@ -487,6 +532,11 @@ test "a tuple struct rides the tuple-struct protocol" {
       #|  deserializer.deserialize_tuple_end()
       #|  Rgb(v0, v1, v2)
       #|}
+      #|
+      #|///|
+      #|#deprecated("reach it through the `Deserialize` bound", skip_current_package=true)
+      #|#doc(hidden)
+      #|pub extend Rgb with @data.Deserialize::{ deserialize }
       #|
     ),
   )
@@ -513,9 +563,19 @@ test "a one-field tuple struct rides the newtype protocol" {
       #|}
       #|
       #|///|
+      #|#deprecated("reach it through the `Serialize` bound", skip_current_package=true)
+      #|#doc(hidden)
+      #|pub extend Meters with @data.Serialize::{ serialize }
+      #|
+      #|///|
       #|pub impl @data.Deserialize for Meters with deserialize(deserializer) {
       #|  Meters(deserializer.deserialize_newtype_struct("Meters"))
       #|}
+      #|
+      #|///|
+      #|#deprecated("reach it through the `Deserialize` bound", skip_current_package=true)
+      #|#doc(hidden)
+      #|pub extend Meters with @data.Deserialize::{ deserialize }
       #|
     ),
   )
@@ -542,10 +602,20 @@ test "a fieldless struct rides the unit-struct protocol" {
       #|}
       #|
       #|///|
+      #|#deprecated("reach it through the `Serialize` bound", skip_current_package=true)
+      #|#doc(hidden)
+      #|pub extend Marker with @data.Serialize::{ serialize }
+      #|
+      #|///|
       #|pub impl @data.Deserialize for Marker with deserialize(deserializer) {
       #|  deserializer.deserialize_unit_struct("Marker")
       #|  Marker::{  }
       #|}
+      #|
+      #|///|
+      #|#deprecated("reach it through the `Deserialize` bound", skip_current_package=true)
+      #|#doc(hidden)
+      #|pub extend Marker with @data.Deserialize::{ deserialize }
       #|
     ),
   )
@@ -574,6 +644,11 @@ test "a record whose fields are all skipped is still a record" {
       #|  serializer.serialize_struct_begin("Opaque", 0)
       #|  serializer.serialize_struct_end()
       #|}
+      #|
+      #|///|
+      #|#deprecated("reach it through the `Serialize` bound", skip_current_package=true)
+      #|#doc(hidden)
+      #|pub extend Opaque with @data.Serialize::{ serialize }
       #|
       #|///|
       #|let __data_record_fields_Opaque :ReadOnlyArray[String] =[]
@@ -621,6 +696,11 @@ test "a record whose fields are all skipped is still a record" {
       #|  { cached: Default::default(), }
       #|}
       #|
+      #|///|
+      #|#deprecated("reach it through the `Deserialize` bound", skip_current_package=true)
+      #|#doc(hidden)
+      #|pub extend Opaque with @data.Deserialize::{ deserialize }
+      #|
     ),
   )
 }
@@ -647,6 +727,11 @@ test "deriving only one direction emits only that impl" {
       #|  serializer.serialize_struct_end()
       #|}
       #|
+      #|///|
+      #|#deprecated("reach it through the `Serialize` bound", skip_current_package=true)
+      #|#doc(hidden)
+      #|pub extend Only with @data.Serialize::{ serialize }
+      #|
     ),
   )
 }
@@ -672,6 +757,11 @@ test "a private type gets a private impl" {
       #|  serializer.serialize_field("a", self.a)
       #|  serializer.serialize_struct_end()
       #|}
+      #|
+      #|///|
+      #|#deprecated("reach it through the `Serialize` bound", skip_current_package=true)
+      #|#doc(hidden)
+      #|extend Hidden with @data.Serialize::{ serialize }
       #|
     ),
   )

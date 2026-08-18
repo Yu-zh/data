@@ -328,6 +328,32 @@ fn field_value(field : Field, indent : String) -> String {
 }
 
 ///|
+/// The `extend` declaration for the method an impl silently promotes.
+///
+/// A trait impl installs its methods as regular methods on the type as well,
+/// so a derived `Serialize` would quietly add `value.serialize(s)` to the
+/// public surface of a project that only asked to derive. Declaring it
+/// deprecated and hidden keeps that out of the user's interface while leaving
+/// the promotion legal for anyone already relying on it: the trait bound is
+/// how generated code reaches these, and how everyone else should.
+fn write_extend(out : StringBuilder, target : Target, trait_ : String) -> Unit {
+  let visibility = if target.public { "pub " } else { "" }
+  let method_name = if trait_ == "Serialize" {
+    "serialize"
+  } else {
+    "deserialize"
+  }
+  out.write_string("\n///|\n")
+  out.write_string(
+    "#deprecated(\"reach it through the `\{trait_}` bound\", skip_current_package=true)\n",
+  )
+  out.write_string("#doc(hidden)\n")
+  out.write_string(
+    "\{visibility}extend \{target.name} with @data.\{trait_}::{\{method_name}}\n",
+  )
+}
+
+///|
 fn write_serialize(out : StringBuilder, target : Target) -> Unit {
   let self_ = if target.reads_self() { "self" } else { "_self" }
   out.write_string("\n///|\n")
@@ -543,10 +569,12 @@ fn emit(targets : Array[Target]) -> String? {
   for target in wanted {
     if target.serialize {
       write_serialize(out, target)
+      write_extend(out, target, "Serialize")
     }
     if target.deserialize {
       write_all_field_metadata(out, target)
       write_deserialize(out, target)
+      write_extend(out, target, "Deserialize")
     }
   }
   Some(out.to_string())
